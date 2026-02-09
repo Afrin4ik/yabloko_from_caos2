@@ -19,7 +19,7 @@ endif
 CFLAGS = -fno-pic -ffreestanding -static -fno-builtin -fno-strict-aliasing \
 		 -mno-sse \
 		 -I. \
-		 -Wall -ggdb -m32 -Werror -fno-omit-frame-pointer
+		 -Wall -ggdb -m32 -Werror -fno-omit-frame-pointer -Os
 CFLAGS += $(shell $(CC) -fno-stack-protector -E -x c /dev/null >/dev/null 2>&1 && echo -fno-stack-protector)
 ASMFLAGS = -m32 -ffreestanding -c -g -I.
 
@@ -43,10 +43,16 @@ OBJECTS = ./kernel/kstart.o ./kernel.o ./console.o ./drivers/vga.o ./drivers/uar
 	./fs/fs.o ./drivers/ata.o ./lib/string.o ./proc.o ./drivers/pit.o ./kernel/vm.o
 
 run: image.bin
-	qemu-system-i386 -drive format=raw,file=$< -serial mon:stdio
+	qemu-system-i386 -drive format=raw,file=$< -serial mon:stdio -qmp unix:qemu-monitor-socket,server,nowait
 
 run-nox: image.bin
-	qemu-system-i386 -nographic -drive format=raw,file=$< -serial mon:stdio
+	qemu-system-i386 -nographic -drive format=raw,file=$< -serial mon:stdio -qmp unix:qemu-monitor-socket,server,nowait
+
+test: tests.py
+	python3 tests.py --nox
+
+test-x: tests.py
+	python3 tests.py
 
 ejudge.sh: image.bin
 	echo >$@ "#!/bin/sh"

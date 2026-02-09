@@ -3,4 +3,13 @@
 *.bin
 *.elf
 *.dSYM
-tools/mkfs
+tools/*
+!tools/*.*
+
+user/*
+!user/*.*
+user/*.o
+
+.idea
+__pycache__
+res.txt
