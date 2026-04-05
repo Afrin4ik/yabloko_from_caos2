@@ -72,6 +72,17 @@ void vga_clear_screen() {
     vga_set_cursor(0);
 }
 
+void vga_backspace() {
+    unsigned offset = vga_get_cursor();
+    if (offset == 0) {
+        return;
+    }
+
+    --offset;
+    vga_set_cursor(offset);
+    vga_set_char(offset, ' ');
+}
+
 static unsigned scroll() {
     kmemmove(video_memory, video_memory + 2 * COLS, 2 * COLS * (ROWS-1));
     for (int col = 0; col < COLS; col++) {
