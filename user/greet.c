@@ -2,6 +2,6 @@
 
 int main(void) {
     syscall(SYS_greet, 0);
-    syscall(SYS_greet, 0);
+    syscall(SYS_exit, 0);
     return 0;
 }
