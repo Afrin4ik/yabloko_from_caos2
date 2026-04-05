@@ -13,6 +13,29 @@
 #include "proc.h"
 #include "kernel/mem.h"
 
+enum {
+    SPINNER_TICKS_PER_FRAME = 25,
+    SPINNER_ROW = 0,
+    SPINNER_COL = 79,
+    SPINNER_FG_WHITE = 0x0f,
+    SPINNER_BG_BLACK = 0x00,
+};
+
+static void update_spinner(void) {
+    static const unsigned char spinner_chars[] = {0x18, 0x1a, 0x19, 0x1b};
+    static unsigned ticks = 0;
+    static unsigned frame = 0;
+
+    ++ticks;
+    if (ticks < SPINNER_TICKS_PER_FRAME) {
+        return;
+    }
+
+    ticks = 0;
+    vga_put_char_at(SPINNER_COL, SPINNER_ROW, (char) spinner_chars[frame], SPINNER_FG_WHITE, SPINNER_BG_BLACK);
+    frame = (frame + 1) % (sizeof(spinner_chars) / sizeof(spinner_chars[0]));
+}
+
 void vga_set_pixel(int x, int y, int color) {
     unsigned char* pixel = (unsigned char*) (KERNBASE + 0xA0000 + 320 * y + x);
     *pixel = color;
@@ -43,6 +66,7 @@ void kmain() {
     sti();
 
     vga_clear_screen();
+    add_timer_callback(update_spinner);
     printk("YABLOKO\n");
 
     printk("\n> ");

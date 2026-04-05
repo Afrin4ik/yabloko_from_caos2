@@ -60,14 +60,25 @@ unsigned vga_get_cursor() {
     return offset;
 }
 
-void vga_set_char(unsigned offset, char c) {
+void vga_set_char(unsigned offset, char c, unsigned char fg, unsigned char bg) {
     video_memory[2 * offset] = c;
-    video_memory[2 * offset + 1] = get_color(light_gray, black);
+    video_memory[2 * offset + 1] = get_color(fg, bg);
+}
+
+static void vga_set_char_default_color(unsigned offset, char c) {
+    vga_set_char(offset, c, light_gray, black);
+}
+
+void vga_put_char_at(unsigned col, unsigned row, char c, unsigned char fg, unsigned char bg) {
+    if (col >= COLS || row >= ROWS) {
+        return;
+    }
+    vga_set_char(get_offset(col, row), c, fg, bg);
 }
 
 void vga_clear_screen() {
     for (unsigned i = 0; i < ROWS * COLS; ++i) {
-        vga_set_char(i, ' ');
+        vga_set_char_default_color(i, ' ');
     }
     vga_set_cursor(0);
 }
@@ -80,13 +91,13 @@ void vga_backspace() {
 
     --offset;
     vga_set_cursor(offset);
-    vga_set_char(offset, ' ');
+    vga_set_char_default_color(offset, ' ');
 }
 
 static unsigned scroll() {
     kmemmove(video_memory, video_memory + 2 * COLS, 2 * COLS * (ROWS-1));
     for (int col = 0; col < COLS; col++) {
-        vga_set_char(get_offset(col, ROWS - 1), ' ');
+        vga_set_char_default_color(get_offset(col, ROWS - 1), ' ');
     }
     return get_offset(0, ROWS - 1);
 }
@@ -97,7 +108,7 @@ void vga_print_string(const char* s) {
         if (*s == '\n') {
             offset = get_offset(0, get_row_from_offset(offset) + 1);
         } else {
-            vga_set_char(offset, *s);
+            vga_set_char_default_color(offset, *s);
             offset++;
         }
         s++;
