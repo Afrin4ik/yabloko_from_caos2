@@ -57,6 +57,24 @@ void run_elf(const char* name) {
     }
     Elf32_Ehdr *hdr = (void*)USER_BASE;
 
+    uintptr_t file_top = USER_BASE + statbuf.size;
+    uintptr_t image_top = file_top;
+    for (uint16_t i = 0; i < hdr->e_phnum; ++i) {
+        Elf32_Phdr *phdr = (Elf32_Phdr*)((char*)hdr + hdr->e_phoff + i * hdr->e_phentsize);
+        if (phdr->p_type != 1 || phdr->p_memsz == 0) {
+            continue;
+        }
+        uintptr_t seg_top = (uintptr_t)phdr->p_vaddr + phdr->p_memsz;
+        if (seg_top > image_top) {
+            image_top = seg_top;
+        }
+    }
+    if (image_top > file_top && allocuvm(vm.user_task->pgdir, file_top, image_top) < 0) {
+        printk(name);
+        printk(": out of memory\n");
+        return;
+    }
+
     struct kstack *u = &vm.user_task->stack;
     memset(u, 0, sizeof(*u));
     u->context.eip = (uint32_t)trapret;

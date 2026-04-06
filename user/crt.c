@@ -3,7 +3,7 @@
 int main();
 
 int syscall(int call, int arg) {
-    asm("int $0x84": "+a"(call) : "b"(arg));
+    asm volatile("int $0x84" : "+a"(call) : "b"(arg) : "memory", "cc");
     return call;
 }
 
