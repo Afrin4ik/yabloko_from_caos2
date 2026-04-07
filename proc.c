@@ -32,13 +32,6 @@ struct vm {
     struct task *user_task;
 } vm;
 
-pde_t* current_user_pgdir(void) {
-    if (!vm.user_task) {
-        return 0;
-    }
-    return vm.user_task->pgdir;
-}
-
 void trapret();
 void swtch(void** oldstack, void* newstack);
 

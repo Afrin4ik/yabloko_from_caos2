@@ -4,9 +4,7 @@
 #include "../syscall.h"
 #include "../proc.h"
 #include "../drivers/port.h"
-#include "../drivers/vga.h"
 #include "../console.h"
-#include "../lib/string.h"
 
 enum {
     IDT_HANDLERS = 256,
@@ -127,75 +125,11 @@ static void* get_userspace_ptr(uint32_t ptr) {
     return (void*)(ptr);
 }
 
-static int user_readable_range(uintptr_t ptr, uintptr_t size) {
-    if (size == 0) {
-        return 1;
-    }
-    if (ptr >= KERNBASE) {
-        return 0;
-    }
-    uintptr_t end = ptr + size;
-    if (end < ptr || end > KERNBASE) {
-        return 0;
-    }
-
-    pde_t* pgdir = current_user_pgdir();
-    if (!pgdir) {
-        return 0;
-    }
-
-    uintptr_t va = ptr;
-    while (va < end) {
-        pde_t pde = pgdir[PDX(va)];
-        if (!(pde & PTE_P) || !(pde & PTE_U)) {
-            return 0;
-        }
-
-        pte_t* pgtab = (pte_t*)P2V(PTE_ADDR(pde));
-        pte_t pte = pgtab[PTX(va)];
-        if (!(pte & PTE_P) || !(pte & PTE_U)) {
-            return 0;
-        }
-
-        uintptr_t next = PGROUNDUP(va + 1);
-        if (next < va + 1 || next > end) {
-            next = end;
-        }
-        va = next;
-    }
-
-    return 1;
-}
-
-static void* get_userspace_ptr_range(uint32_t ptr, uintptr_t size) {
-    if (!user_readable_range(ptr, size)) {
-        return 0;
-    }
-    return (void*)ptr;
-}
-
 static int handle_puts(const char* s) {
     if (!s) {
         return -1;
     }
     printk(s);
-    return 0;
-}
-
-enum {
-    MODE13_WIDTH = 320,
-    MODE13_HEIGHT = 200,
-    MODE13_FB_SIZE = MODE13_WIDTH * MODE13_HEIGHT,
-    VGA_MODE13_PA = 0xA0000,
-};
-
-static int handle_enter13h(const char* framebuffer) {
-    if (!framebuffer) {
-        return -1;
-    }
-
-    vgaMode13();
-    kmemmove((char*)(KERNBASE + VGA_MODE13_PA), (char*)framebuffer, MODE13_FB_SIZE);
     return 0;
 }
 
@@ -218,9 +152,6 @@ static void handle_syscall(registers_t* r) {
             break;
         case SYS_puts:
             r->eax = handle_puts(get_userspace_ptr(r->ebx));
-            break;
-        case SYS_enter13h:
-            r->eax = handle_enter13h(get_userspace_ptr_range(r->ebx, MODE13_FB_SIZE));
             break;
         default:
             printk("Unknown syscall\n");
