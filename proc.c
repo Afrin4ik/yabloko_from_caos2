@@ -5,6 +5,7 @@
 #include "cpu/isr.h"
 #include "cpu/memlayout.h"
 #include "kernel/mem.h"
+#include "kernel/gfx.h"
 #include "lib/string.h"
 #include "console.h"
 
@@ -105,8 +106,10 @@ void run_elf(const char* name) {
 
 _Noreturn void killproc() {
     void* task_stack;
+    gfx_detach_user_fb();
     switchkvm();
     freevm(vm.user_task->pgdir);
+    vm.user_task->pgdir = 0;
     sti();
     swtch(&task_stack, vm.kernel_thread);
     __builtin_unreachable();
