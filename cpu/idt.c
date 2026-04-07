@@ -87,6 +87,44 @@ void register_interrupt_handler(uint8_t i, isr_t handler) {
     interrupt_handlers[i] = handler;
 }
 
+uintptr_t user_readable_after(uintptr_t ptr) {
+    if (ptr >= KERNBASE) {
+        return 0;
+    }
+
+    pde_t *pgdir = (pde_t*)P2V(rcr3());
+    uintptr_t va = ptr;
+    uintptr_t bytes = 0;
+
+    while (va < KERNBASE) {
+        pde_t pde = pgdir[PDX(va)];
+        if (!(pde & PTE_P) || !(pde & PTE_U)) {
+            break;
+        }
+
+        uintptr_t page_end;
+        if (pde & PTE_PS) {
+            page_end = (va & ~((1u << PDXSHIFT) - 1)) + (1u << PDXSHIFT);
+        } else {
+            pte_t *pgtab = (pte_t*)P2V(PTE_ADDR(pde));
+            pte_t pte = pgtab[PTX(va)];
+            if (!(pte & PTE_P) || !(pte & PTE_U)) {
+                break;
+            }
+            page_end = PGROUNDDOWN(va) + PGSIZE;
+        }
+
+        if (page_end > KERNBASE) {
+            page_end = KERNBASE;
+        }
+
+        bytes += page_end - va;
+        va = page_end;
+    }
+
+    return bytes;
+}
+
 void trap(registers_t *r) {
     // EOI
     if (r->int_no >= 40) {
@@ -120,33 +158,18 @@ void trap(registers_t *r) {
 }
 
 static void* get_userspace_ptr(uint32_t ptr) {
-    if (ptr >= KERNBASE) {
+    uintptr_t readable = user_readable_after(ptr);
+    if (readable == 0) {
         return 0;
     }
 
-    pde_t *pgdir = (pde_t*)P2V(rcr3());
-    uintptr_t va = ptr;
-    while (1) {
-        pde_t pde = pgdir[PDX(va)];
-        if (!(pde & PTE_P) || !(pde & PTE_U)) {
-            return 0;
+    for (uintptr_t i = 0; i < readable; ++i) {
+        if (((const char*)ptr)[i] == '\0') {
+            return (void*)ptr;
         }
-
-        if (!(pde & PTE_PS)) {
-            pte_t *pgtab = (pte_t*)P2V(PTE_ADDR(pde));
-            pte_t pte = pgtab[PTX(va)];
-            if (!(pte & PTE_P) || !(pte & PTE_U)) {
-                return 0;
-            }
-        }
-
-        if (*(char*)va == '\0') {
-            break;
-        }
-        ++va;
     }
 
-    return (void*)(ptr);
+    return 0;
 }
 
 static int handle_puts(const char* s) {
