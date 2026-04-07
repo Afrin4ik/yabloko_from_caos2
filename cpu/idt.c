@@ -3,9 +3,12 @@
 #include "x86.h"
 #include "memlayout.h"
 #include "../syscall.h"
+#include "../video.h"
 #include "../proc.h"
 #include "../kernel/mem.h"
+#include "../lib/string.h"
 #include "../drivers/port.h"
+#include "../drivers/vga.h"
 #include "../console.h"
 
 enum {
@@ -180,6 +183,16 @@ static int handle_puts(const char* s) {
     return 0;
 }
 
+static int handle_enter13h(uint32_t user_fb_ptr) {
+    if (user_readable_after(user_fb_ptr) < VIDEO_MODE13_FRAMEBUFFER_SIZE) {
+        return -1;
+    }
+
+    vgaMode13();
+    kmemmove((char*)P2V(0xA0000), (char*)user_fb_ptr, VIDEO_MODE13_FRAMEBUFFER_SIZE);
+    return 0;
+}
+
 static void handle_syscall(registers_t* r) {
     switch (r->eax) {
         case SYS_exit:
@@ -199,6 +212,9 @@ static void handle_syscall(registers_t* r) {
             break;
         case SYS_puts:
             r->eax = handle_puts(get_userspace_ptr(r->ebx));
+            break;
+        case SYS_enter13h:
+            r->eax = handle_enter13h(r->ebx);
             break;
         default:
             printk("Unknown syscall\n");
