@@ -105,7 +105,7 @@ debug-nox: image.bin
 		-ex "break _start" \
 		-ex "continue"
 
-USERPROGS=./user/false ./user/greet ./user/div0 ./user/shout ./user/badputs ./user/bss
+USERPROGS=./user/false ./user/greet ./user/div0 ./user/shout ./user/badputs ./user/bss ./user/snake
 
 fs.img: ./kernel.bin ./tools/mkfs $(USERPROGS)
 	./tools/mkfs $@ $< $(USERPROGS)
