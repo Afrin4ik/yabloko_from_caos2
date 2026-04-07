@@ -40,7 +40,7 @@ endif
 OBJECTS = ./kernel/kstart.o ./kernel.o ./console.o ./drivers/vga.o ./drivers/uart.o ./drivers/keyboard.o \
 	./drivers/graphics.o \
 	./cpu/idt.o ./cpu/gdt.o ./cpu/swtch.o ./cpu/vectors.o ./kernel/mem.o ./proc.o ./lib/string.o \
-	./fs/fs.o ./drivers/ata.o ./lib/string.o ./proc.o ./drivers/pit.o ./kernel/vm.o ./kernel/gfx.o
+	./fs/fs.o ./drivers/ata.o ./lib/string.o ./proc.o ./drivers/pit.o ./kernel/vm.o
 
 run: image.bin
 	qemu-system-i386 -drive format=raw,file=$< -serial mon:stdio -qmp unix:qemu-monitor-socket,server,nowait

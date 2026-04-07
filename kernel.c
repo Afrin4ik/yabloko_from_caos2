@@ -12,7 +12,6 @@
 #include "lib/string.h"
 #include "proc.h"
 #include "kernel/mem.h"
-#include "kernel/gfx.h"
 
 enum {
     SPINNER_TICKS_PER_FRAME = 25,
@@ -68,7 +67,6 @@ void kmain() {
 
     vga_clear_screen();
     add_timer_callback(update_spinner);
-    add_timer_callback(gfx_tick);
     printk("YABLOKO\n");
 
     printk("\n> ");

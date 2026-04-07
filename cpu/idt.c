@@ -4,8 +4,9 @@
 #include "../syscall.h"
 #include "../proc.h"
 #include "../drivers/port.h"
+#include "../drivers/vga.h"
 #include "../console.h"
-#include "../kernel/gfx.h"
+#include "../lib/string.h"
 
 enum {
     IDT_HANDLERS = 256,
@@ -185,10 +186,17 @@ enum {
     MODE13_WIDTH = 320,
     MODE13_HEIGHT = 200,
     MODE13_FB_SIZE = MODE13_WIDTH * MODE13_HEIGHT,
+    VGA_MODE13_PA = 0xA0000,
 };
 
 static int handle_enter13h(const char* framebuffer) {
-    return gfx_enter_mode13(framebuffer);
+    if (!framebuffer) {
+        return -1;
+    }
+
+    vgaMode13();
+    kmemmove((char*)(KERNBASE + VGA_MODE13_PA), (char*)framebuffer, MODE13_FB_SIZE);
+    return 0;
 }
 
 static void handle_syscall(registers_t* r) {

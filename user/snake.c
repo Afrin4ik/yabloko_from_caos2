@@ -10,9 +10,8 @@ enum {
 static unsigned char framebuffer[FB_SIZE];
 
 int main() {
-    unsigned char color = 0;
     for (int i = 0; i < FB_SIZE; ++i) {
-        framebuffer[i] = color;
+        framebuffer[i] = 0x3A;
     }
 
     int rc = syscall(SYS_enter13h, (uint32_t)framebuffer);
@@ -22,13 +21,6 @@ int main() {
     }
 
     while (1) {
-        color += 1;
-        for (int i = 0; i < FB_SIZE; ++i) {
-            framebuffer[i] = color;
-        }
-
-        for (volatile int spin = 0; spin < 150000; ++spin) {
-        }
     }
 
     return 0;
