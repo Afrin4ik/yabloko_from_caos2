@@ -1,8 +1,10 @@
 #include "isr.h"
 #include "gdt.h"
+#include "x86.h"
 #include "memlayout.h"
 #include "../syscall.h"
 #include "../proc.h"
+#include "../kernel/mem.h"
 #include "../drivers/port.h"
 #include "../console.h"
 
@@ -118,10 +120,32 @@ void trap(registers_t *r) {
 }
 
 static void* get_userspace_ptr(uint32_t ptr) {
-    if (ptr > KERNBASE) {
+    if (ptr >= KERNBASE) {
         return 0;
     }
-    // FIXME: check if ptr is mapped and a valid 0-terminated string
+
+    pde_t *pgdir = (pde_t*)P2V(rcr3());
+    uintptr_t va = ptr;
+    while (1) {
+        pde_t pde = pgdir[PDX(va)];
+        if (!(pde & PTE_P) || !(pde & PTE_U)) {
+            return 0;
+        }
+
+        if (!(pde & PTE_PS)) {
+            pte_t *pgtab = (pte_t*)P2V(PTE_ADDR(pde));
+            pte_t pte = pgtab[PTX(va)];
+            if (!(pte & PTE_P) || !(pte & PTE_U)) {
+                return 0;
+            }
+        }
+
+        if (*(char*)va == '\0') {
+            break;
+        }
+        ++va;
+    }
+
     return (void*)(ptr);
 }
 

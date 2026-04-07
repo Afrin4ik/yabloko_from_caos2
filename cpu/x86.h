@@ -18,3 +18,11 @@ lcr3(uint32_t val)
 {
   asm volatile("mov %0,%%cr3" : : "r" (val));
 }
+
+static inline uint32_t
+rcr3(void)
+{
+  uint32_t val;
+  asm volatile("mov %%cr3,%0" : "=r" (val));
+  return val;
+}
