@@ -7,6 +7,7 @@
 #include "../proc.h"
 #include "../kernel/mem.h"
 #include "../lib/string.h"
+#include "../drivers/mode13fb.h"
 #include "../drivers/port.h"
 #include "../drivers/vga.h"
 #include "../console.h"
@@ -188,8 +189,7 @@ static int handle_enter13h(uint32_t user_fb_ptr) {
         return -1;
     }
 
-    vgaMode13();
-    kmemmove((char*)P2V(0xA0000), (char*)user_fb_ptr, VIDEO_MODE13_FRAMEBUFFER_SIZE);
+    mode13_fb_bind(user_fb_ptr);
     return 0;
 }
 

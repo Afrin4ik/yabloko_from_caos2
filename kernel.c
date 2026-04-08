@@ -3,6 +3,7 @@
 #include "cpu/gdt.h"
 #include "cpu/memlayout.h"
 #include "drivers/keyboard.h"
+#include "drivers/mode13fb.h"
 #include "drivers/vga.h"
 #include "drivers/ata.h"
 #include "drivers/misc.h"
@@ -61,6 +62,7 @@ void kmain() {
     load_gdt();
     init_keyboard();
     init_pit();
+    mode13_fb_init();
     uartinit();
     load_idt();
     sti();

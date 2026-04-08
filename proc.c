@@ -4,6 +4,7 @@
 #include "cpu/gdt.h"
 #include "cpu/isr.h"
 #include "cpu/memlayout.h"
+#include "drivers/mode13fb.h"
 #include "kernel/mem.h"
 #include "lib/string.h"
 #include "console.h"
@@ -98,6 +99,7 @@ void run_elf(const char* name) {
 
 _Noreturn void killproc() {
     void* task_stack;
+    mode13_fb_unbind();
     switchkvm();
     freevm(vm.user_task->pgdir);
     sti();

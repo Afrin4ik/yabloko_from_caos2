@@ -4,11 +4,20 @@
 
 int main() {
     static uint8_t framebuffer[VIDEO_MODE13_FRAMEBUFFER_SIZE];
+    syscall(SYS_enter13h, (uint32_t)framebuffer);
 
-    for (int i = 0; i < VIDEO_MODE13_FRAMEBUFFER_SIZE; ++i) {
-        framebuffer[i] = 0x3a;
+    uint8_t color = 0;
+    while (1) {
+        for (int i = 0; i < VIDEO_MODE13_FRAMEBUFFER_SIZE; ++i) {
+            framebuffer[i] = color;
+        }
+
+        ++color;
+
+        // Small busy-wait delay so color changes are visible.
+        for (volatile int spin = 0; spin < 200000; ++spin) {
+        }
     }
 
-    syscall(SYS_enter13h, (uint32_t)framebuffer);
     return 0;
 }
