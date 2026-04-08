@@ -8,6 +8,7 @@
 #include "../kernel/mem.h"
 #include "../lib/string.h"
 #include "../drivers/mode13fb.h"
+#include "../drivers/keyboard.h"
 #include "../drivers/port.h"
 #include "../drivers/vga.h"
 #include "../console.h"
@@ -193,6 +194,15 @@ static int handle_enter13h(uint32_t user_fb_ptr) {
     return 0;
 }
 
+static int handle_leave13h(void) {
+    proc_restore_text_mode();
+    return 0;
+}
+
+static int handle_getc(void) {
+    return kbd_pop_char();
+}
+
 static void handle_syscall(registers_t* r) {
     switch (r->eax) {
         case SYS_exit:
@@ -213,8 +223,14 @@ static void handle_syscall(registers_t* r) {
         case SYS_puts:
             r->eax = handle_puts(get_userspace_ptr(r->ebx));
             break;
+        case SYS_getc:
+            r->eax = handle_getc();
+            break;
         case SYS_enter13h:
             r->eax = handle_enter13h(r->ebx);
+            break;
+        case SYS_leave13h:
+            r->eax = handle_leave13h();
             break;
         default:
             printk("Unknown syscall\n");

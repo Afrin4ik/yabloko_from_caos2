@@ -4,7 +4,9 @@
 #include "cpu/gdt.h"
 #include "cpu/isr.h"
 #include "cpu/memlayout.h"
+#include "drivers/keyboard.h"
 #include "drivers/mode13fb.h"
+#include "drivers/vga.h"
 #include "kernel/mem.h"
 #include "lib/string.h"
 #include "console.h"
@@ -99,10 +101,27 @@ void run_elf(const char* name) {
 
 _Noreturn void killproc() {
     void* task_stack;
-    mode13_fb_unbind();
+    proc_restore_text_mode();
     switchkvm();
     freevm(vm.user_task->pgdir);
     sti();
     swtch(&task_stack, vm.kernel_thread);
     __builtin_unreachable();
+}
+
+void proc_restore_text_mode(void) {
+    if (!mode13_fb_is_active()) {
+        return;
+    }
+
+    mode13_fb_unbind();
+    vgaMode3();
+
+    uint16_t* text_vram = (uint16_t*)P2V(0xb8000);
+    for (unsigned i = 0; i < 80 * 25; ++i) {
+        text_vram[i] = (0x07u << 8) | ' ';
+    }
+
+    vga_clear_screen();
+    kbd_clear_buffer();
 }

@@ -8,6 +8,11 @@ int main() {
 
     uint8_t color = 0;
     while (1) {
+        int key = syscall(SYS_getc, 0);
+        if (key == 'q' || key == 'Q') {
+            break;
+        }
+
         for (int i = 0; i < VIDEO_MODE13_FRAMEBUFFER_SIZE; ++i) {
             framebuffer[i] = color;
         }
@@ -19,5 +24,6 @@ int main() {
         }
     }
 
+    syscall(SYS_leave13h, 0);
     return 0;
 }

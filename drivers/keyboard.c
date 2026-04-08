@@ -86,6 +86,24 @@ static void interrupt_handler(registers_t *r) {
 char* kbd_buf;
 unsigned kbd_buf_size;
 
+int kbd_pop_char(void) {
+    if (kbd_buf_size == 0) {
+        return 0;
+    }
+
+    char c = kbd_buf[0];
+    for (unsigned i = 1; i < kbd_buf_size; ++i) {
+        kbd_buf[i - 1] = kbd_buf[i];
+    }
+    --kbd_buf_size;
+
+    return (unsigned char)c;
+}
+
+void kbd_clear_buffer(void) {
+    kbd_buf_size = 0;
+}
+
 void init_keyboard() {
     kbd_buf = kalloc();
 

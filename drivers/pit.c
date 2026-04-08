@@ -29,6 +29,9 @@ static timer_callback callbacks[100];
 static int registered_callbacks = 0;
 
 void add_timer_callback(timer_callback tc) {
+    if (registered_callbacks >= (int)(sizeof(callbacks) / sizeof(callbacks[0]))) {
+        return;
+    }
     callbacks[registered_callbacks++] = tc;
 }
 

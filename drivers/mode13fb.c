@@ -33,3 +33,7 @@ void mode13_fb_unbind(void) {
     mode13_enabled = 0;
     mode13_user_fb_ptr = 0;
 }
+
+_Bool mode13_fb_is_active(void) {
+    return mode13_enabled;
+}
