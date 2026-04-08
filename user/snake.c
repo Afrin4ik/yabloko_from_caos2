@@ -1,29 +1,35 @@
 #include "../syscall.h"
-#include "../video.h"
-#include <stdint.h>
+#include "user/lib/gfx.h"
 
-int main() {
-    static uint8_t framebuffer[VIDEO_MODE13_FRAMEBUFFER_SIZE];
-    syscall(SYS_enter13h, (uint32_t)framebuffer);
+static void draw_grid_demo(void) {
+    clear(0);
 
-    uint8_t color = 0;
-    while (1) {
-        int key = syscall(SYS_getc, 0);
-        if (key == 'q' || key == 'Q') {
-            break;
-        }
+    for (int y = 0; y < GFX_GRID_HEIGHT; ++y) {
+        for (int x = 0; x < GFX_GRID_WIDTH; ++x) {
+            uint8_t color = (uint8_t)(1 + ((x + y) % 14));
 
-        for (int i = 0; i < VIDEO_MODE13_FRAMEBUFFER_SIZE; ++i) {
-            framebuffer[i] = color;
-        }
+            if (x == 0 || y == 0 || x == GFX_GRID_WIDTH - 1 || y == GFX_GRID_HEIGHT - 1) {
+                color = 15;
+            }
 
-        ++color;
-
-        // Small busy-wait delay so color changes are visible.
-        for (volatile int spin = 0; spin < 200000; ++spin) {
+            draw_cell(x, y, color);
         }
     }
 
-    syscall(SYS_leave13h, 0);
+    present();
+}
+
+int main() {
+    // present();
+    draw_grid_demo();
+
+    while (1) {
+        int key = syscall(SYS_getc, 0);
+        if (key == 'q' || key == 'Q') {
+            syscall(SYS_leave13h, 0);
+            break;
+        }
+    }
+
     return 0;
 }

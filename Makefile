@@ -40,7 +40,7 @@ endif
 OBJECTS = ./kernel/kstart.o ./kernel.o ./console.o ./drivers/vga.o ./drivers/uart.o ./drivers/keyboard.o \
 	./drivers/graphics.o ./drivers/mode13fb.o \
 	./cpu/idt.o ./cpu/gdt.o ./cpu/swtch.o ./cpu/vectors.o ./kernel/mem.o ./proc.o ./lib/string.o \
-	./fs/fs.o ./drivers/ata.o ./lib/string.o ./proc.o ./drivers/pit.o ./kernel/vm.o
+	./fs/fs.o ./drivers/ata.o ./drivers/pit.o ./kernel/vm.o
 
 run: image.bin
 	qemu-system-i386 -drive format=raw,file=$< -serial mon:stdio -qmp unix:qemu-monitor-socket,server,nowait
@@ -115,6 +115,9 @@ LDFLAGS=-m elf_i386
 user/%: user/%.o user/crt.o
 	$(LD) $(LDFLAGS) -o $@ -Ttext 0x401000 $^
 
+user/snake: user/snake.o user/lib/gfx.o user/crt.o
+	$(LD) $(LDFLAGS) -o $@ -Ttext 0x401000 $^
+
 kernel.bin: $(OBJECTS)
 	$(LD) $(LDFLAGS) $(LDKERNELFLAGS) -o $@ -Ttext 0x80009000 $^
 
@@ -138,7 +141,7 @@ mbr.elf: mbr.o bootmain.o
 	$(LD) -N -m elf_i386 -Ttext=0x7c00 $^ -o $@
 
 clean:
-	rm -f *.elf *.img *.bin *.raw *.o */*.o tools/mkfs ejudge.sh
+	rm -f *.elf *.img *.bin *.raw *.o */*.o */*/*.o tools/mkfs ejudge.sh
 
 tools/%: tools/%.c
 	gcc -Wall -Werror -g $^ -o $@
