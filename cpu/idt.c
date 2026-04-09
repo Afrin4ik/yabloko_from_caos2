@@ -200,7 +200,7 @@ static int handle_leave13h(void) {
 }
 
 static int handle_getc(void) {
-    return kbd_pop_char();
+    return kbd_pop_event();
 }
 
 static void handle_syscall(registers_t* r) {

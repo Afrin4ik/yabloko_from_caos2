@@ -1,4 +1,5 @@
 #include "../syscall.h"
+#include "../drivers/keyboard_event.h"
 #include "user/lib/gfx.h"
 
 static void draw_grid_demo(void) {
@@ -24,7 +25,12 @@ int main() {
     draw_grid_demo();
 
     while (1) {
-        int key = syscall(SYS_getc, 0);
+        int event = syscall(SYS_getc, 0);
+        if (!event || !kbd_event_is_pressed(event)) {
+            continue;
+        }
+
+        int key = kbd_event_keycode(event);
         if (key == 'q' || key == 'Q') {
             syscall(SYS_leave13h, 0);
             break;

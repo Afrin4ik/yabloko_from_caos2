@@ -1,10 +1,12 @@
 #include "keyboard.h"
 #include "cpu/isr.h"
-#include "cpu/memlayout.h"
-#include "console.h"
+#include <stdint.h>
 #include "port.h"
-#include "kernel/mem.h"
-#include "vga.h"
+#include "keyboard_event.h"
+
+enum {
+    KBD_EVENT_QUEUE_CAPACITY = 32,
+};
 
 static const char sc_ascii[] = {
     '?', '?', '1', '2', '3', '4', '5', '6',
@@ -26,86 +28,100 @@ static int left_shift_pressed = 0;
 static int right_shift_pressed = 0;
 static int shift_pressed = 0;
 
-enum { kbd_buf_capacity = PGSIZE };
+static int kbd_event_queue[KBD_EVENT_QUEUE_CAPACITY];
+static unsigned kbd_event_head;
+static unsigned kbd_event_tail;
+static unsigned kbd_event_size;
 
 enum {
+    kbd_data_port = 0x60,
+    kbd_extended_scancode_prefix_e0 = 0xe0,
+    kbd_extended_scancode_prefix_e1 = 0xe1,
+    kbd_set1_release_bit = 0x80,
+    kbd_set1_scancode_mask = 0x7f,
+
     left_shift_pressed_scancode = 0x2a,
-    left_shift_released_scancode = 0xaa,
     right_shift_pressed_scancode = 0x36,
-    right_shift_released_scancode = 0xb6,
     backspace_scancode = 0x0e,
 };
 
 static void interrupt_handler(registers_t *r) {
-    uint8_t scancode = port_byte_in(0x60);
+    (void)r;
+    uint8_t raw_scancode = port_byte_in(kbd_data_port);
+    if (raw_scancode == kbd_extended_scancode_prefix_e0 || raw_scancode == kbd_extended_scancode_prefix_e1) {
+        return;
+    }
+
+    int pressed = (raw_scancode & kbd_set1_release_bit) == 0;
+    uint8_t scancode = raw_scancode & kbd_set1_scancode_mask;
 
     if (scancode == left_shift_pressed_scancode) {
-        left_shift_pressed = 1;
-        shift_pressed = 1;
-        return;
-    }
-
-    if (scancode == left_shift_released_scancode) {
-        left_shift_pressed = 0;
+        left_shift_pressed = pressed;
         shift_pressed = left_shift_pressed || right_shift_pressed;
-        return;
-    }
-
-    if (scancode == right_shift_pressed_scancode) {
-        right_shift_pressed = 1;
-        shift_pressed = 1;
-        return;
-    }
-
-    if (scancode == right_shift_released_scancode) {
-        right_shift_pressed = 0;
+    } else if (scancode == right_shift_pressed_scancode) {
+        right_shift_pressed = pressed;
         shift_pressed = left_shift_pressed || right_shift_pressed;
-        return;
     }
 
+    uint8_t keycode = 0;
     if (scancode == backspace_scancode) {
-        if (kbd_buf_size > 0) {
-            --kbd_buf_size;
-            vga_backspace();
-        }
-        return;
-    }
-
-    if (!(scancode & 0x80) && scancode < sizeof(sc_ascii)) {
+        keycode = '\b';
+    } else if (scancode < sizeof(sc_ascii)) {
         char c = shift_pressed ? sc_ascii_shift[scancode] : sc_ascii[scancode];
         if (c != '?') {
-            if (kbd_buf_size < kbd_buf_capacity) {
-                kbd_buf[kbd_buf_size++] = c;
-            }
-            char string[] = {c, '\0'};
-            printk(string);
+            keycode = (uint8_t)c;
         }
     }
+
+    int event = kbd_event_pack(scancode, keycode, pressed);
+    if (kbd_event_size == KBD_EVENT_QUEUE_CAPACITY) {
+        kbd_event_tail = (kbd_event_tail + 1) % KBD_EVENT_QUEUE_CAPACITY;
+        --kbd_event_size;
+    }
+    kbd_event_queue[kbd_event_head] = event;
+    kbd_event_head = (kbd_event_head + 1) % KBD_EVENT_QUEUE_CAPACITY;
+    ++kbd_event_size;
 }
 
-char* kbd_buf;
-unsigned kbd_buf_size;
+static uint32_t irq_save_disable(void) {
+    uint32_t eflags;
+    asm volatile("pushfl; popl %0; cli" : "=r"(eflags) : : "memory", "cc");
+    return eflags;
+}
 
-int kbd_pop_char(void) {
-    if (kbd_buf_size == 0) {
+static void irq_restore(uint32_t eflags) {
+    asm volatile("pushl %0; popfl" : : "r"(eflags) : "memory", "cc");
+}
+
+int kbd_pop_event(void) {
+    uint32_t eflags = irq_save_disable();
+    if (kbd_event_size == 0) {
+        irq_restore(eflags);
         return 0;
     }
 
-    char c = kbd_buf[0];
-    for (unsigned i = 1; i < kbd_buf_size; ++i) {
-        kbd_buf[i - 1] = kbd_buf[i];
-    }
-    --kbd_buf_size;
-
-    return (unsigned char)c;
+    int event = kbd_event_queue[kbd_event_tail];
+    kbd_event_tail = (kbd_event_tail + 1) % KBD_EVENT_QUEUE_CAPACITY;
+    --kbd_event_size;
+    irq_restore(eflags);
+    return event;
 }
 
 void kbd_clear_buffer(void) {
-    kbd_buf_size = 0;
+    uint32_t eflags = irq_save_disable();
+    kbd_event_head = 0;
+    kbd_event_tail = 0;
+    kbd_event_size = 0;
+    irq_restore(eflags);
 }
 
 void init_keyboard() {
-    kbd_buf = kalloc();
+    left_shift_pressed = 0;
+    right_shift_pressed = 0;
+    shift_pressed = 0;
+    kbd_event_head = 0;
+    kbd_event_tail = 0;
+    kbd_event_size = 0;
 
     register_interrupt_handler(IRQ1, interrupt_handler);
 }

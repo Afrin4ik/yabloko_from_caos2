@@ -3,6 +3,7 @@
 #include "cpu/gdt.h"
 #include "cpu/memlayout.h"
 #include "drivers/keyboard.h"
+#include "drivers/keyboard_event.h"
 #include "drivers/mode13fb.h"
 #include "drivers/vga.h"
 #include "drivers/ata.h"
@@ -20,7 +21,11 @@ enum {
     SPINNER_COL = 79,
     SPINNER_FG_WHITE = 0x0f,
     SPINNER_BG_BLACK = 0x00,
+    SHELL_CMD_CAPACITY = 128,
 };
+
+static char shell_cmd[SHELL_CMD_CAPACITY];
+static unsigned shell_cmd_size;
 
 static void update_spinner(void) {
     static const unsigned char spinner_chars[] = {0x18, 0x1a, 0x19, 0x1b};
@@ -54,6 +59,66 @@ void graphtest() {
     vga_clear_screen();
 }
 
+static void shell_reset(void) {
+    shell_cmd_size = 0;
+}
+
+static void shell_execute_line(void) {
+    shell_cmd[shell_cmd_size] = '\0';
+    printk("\n");
+
+    if (shell_cmd_size == 4 && !strncmp("halt", shell_cmd, 4)) {
+        qemu_shutdown();
+    } else if (shell_cmd_size == 4 && !strncmp("work", shell_cmd, 4)) {
+        for (int i = 0; i < 5; ++i) {
+            msleep(1000);
+            printk(".");
+        }
+    } else if (shell_cmd_size >= 4 && !strncmp("run ", shell_cmd, 4)) {
+        const char* cmd = shell_cmd + 4;
+        run_elf(cmd);
+    } else if (shell_cmd_size == 9 && !strncmp("graphtest", shell_cmd, 9)) {
+        graphtest();
+    } else {
+        printk("unknown command, try: halt | run CMD");
+    }
+
+    shell_reset();
+    printk("\n> ");
+}
+
+static void shell_handle_key_event(int event) {
+    if (!kbd_event_is_pressed(event)) {
+        return;
+    }
+
+    char keycode = (char)kbd_event_keycode(event);
+    if (!keycode) {
+        return;
+    }
+
+    if (keycode == '\b') {
+        if (shell_cmd_size > 0) {
+            --shell_cmd_size;
+            vga_backspace();
+        }
+        return;
+    }
+
+    if (keycode == '\n') {
+        shell_execute_line();
+        return;
+    }
+
+    if (shell_cmd_size + 1 >= SHELL_CMD_CAPACITY) {
+        return;
+    }
+
+    shell_cmd[shell_cmd_size++] = keycode;
+    char out[] = {keycode, '\0'};
+    printk(out);
+}
+
 void kmain() {
     freerange(P2V(1u<<20), P2V(2u<<20)); // 1MB - 2MB
     kvmalloc();  // map all of physical memory at KERNBASE
@@ -71,27 +136,12 @@ void kmain() {
     add_timer_callback(update_spinner);
     printk("YABLOKO\n");
 
+    shell_reset();
     printk("\n> ");
     while (1) {
-        if (kbd_buf_size > 0 && kbd_buf[kbd_buf_size-1] == '\n') {
-            if (!strncmp("halt\n", kbd_buf, kbd_buf_size)) {
-                qemu_shutdown();
-            } else if (!strncmp("work\n", kbd_buf, kbd_buf_size)) {
-                for (int i = 0; i < 5; ++i) {
-                    msleep(1000);
-                    printk(".");
-                }
-            } else if (!strncmp("run ", kbd_buf, 4)) {
-                kbd_buf[kbd_buf_size-1] = '\0';
-                const char* cmd = kbd_buf + 4;
-                run_elf(cmd);
-            } else if (!strncmp("graphtest", kbd_buf, 9)) {
-                graphtest();
-            } else {
-                printk("unknown command, try: halt | run CMD");
-            }
-            kbd_buf_size = 0;
-            printk("\n> ");
+        int event;
+        while ((event = kbd_pop_event()) != 0) {
+            shell_handle_key_event(event);
         }
         asm("hlt");
     }
