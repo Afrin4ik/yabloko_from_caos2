@@ -203,6 +203,61 @@ static int handle_getc(void) {
     return kbd_pop_event();
 }
 
+static int user_writable_after(uintptr_t ptr) {
+    if (ptr >= KERNBASE) {
+        return 0;
+    }
+
+    pde_t *pgdir = (pde_t*)P2V(rcr3());
+    uintptr_t va = ptr;
+    uintptr_t bytes = 0;
+
+    while (va < KERNBASE) {
+        pde_t pde = pgdir[PDX(va)];
+        if (!(pde & PTE_P) || !(pde & PTE_U)) {
+            break;
+        }
+
+        uintptr_t page_end;
+        if (pde & PTE_PS) {
+            if (!(pde & PTE_W)) {
+                break;
+            }
+            page_end = (va & ~((1u << PDXSHIFT) - 1)) + (1u << PDXSHIFT);
+        } else {
+            pte_t *pgtab = (pte_t*)P2V(PTE_ADDR(pde));
+            pte_t pte = pgtab[PTX(va)];
+            if (!(pte & PTE_P) || !(pte & PTE_U) || !(pte & PTE_W)) {
+                break;
+            }
+            page_end = PGROUNDDOWN(va) + PGSIZE;
+        }
+
+        if (page_end > KERNBASE) {
+            page_end = KERNBASE;
+        }
+
+        bytes += page_end - va;
+        va = page_end;
+    }
+
+    return (int)bytes;
+}
+
+static int handle_poll(uint32_t user_event_ptr) {
+    if (user_writable_after(user_event_ptr) < (int)sizeof(int)) {
+        return -1;
+    }
+
+    int event = kbd_pop_event();
+    if (event == 0) {
+        return 0;
+    }
+
+    *(int*)user_event_ptr = event;
+    return 1;
+}
+
 static void handle_syscall(registers_t* r) {
     switch (r->eax) {
         case SYS_exit:
@@ -231,6 +286,9 @@ static void handle_syscall(registers_t* r) {
             break;
         case SYS_leave13h:
             r->eax = handle_leave13h();
+            break;
+        case SYS_poll:
+            r->eax = handle_poll(r->ebx);
             break;
         default:
             printk("Unknown syscall\n");

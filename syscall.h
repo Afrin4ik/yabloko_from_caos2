@@ -9,6 +9,7 @@ enum {
 	SYS_getc = 4,
 	SYS_enter13h = 5,
 	SYS_leave13h = 6,
+	SYS_poll = 7,
 };
 
 int syscall(int call, int arg);

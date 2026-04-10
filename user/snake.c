@@ -2,37 +2,73 @@
 #include "../drivers/keyboard_event.h"
 #include "user/lib/gfx.h"
 
-static void draw_grid_demo(void) {
-    clear(0);
+static void putc_sys(char c) {
+    syscall(SYS_putc, c);
+}
 
-    for (int y = 0; y < GFX_GRID_HEIGHT; ++y) {
-        for (int x = 0; x < GFX_GRID_WIDTH; ++x) {
-            uint8_t color = (uint8_t)(1 + ((x + y) % 14));
+static void puts_sys(const char* s) {
+    syscall(SYS_puts, (int)s);
+}
 
-            if (x == 0 || y == 0 || x == GFX_GRID_WIDTH - 1 || y == GFX_GRID_HEIGHT - 1) {
-                color = 15;
-            }
+static void putu_sys(unsigned value) {
+    char buf[11];
+    unsigned i = 0;
 
-            draw_cell(x, y, color);
-        }
+    if (value == 0) {
+        putc_sys('0');
+        return;
     }
 
-    present();
+    while (value > 0) {
+        buf[i++] = (char)('0' + (value % 10));
+        value /= 10;
+    }
+
+    while (i > 0) {
+        putc_sys(buf[--i]);
+    }
+}
+
+static void print_status(unsigned event_count, unsigned idle_heartbeats) {
+    puts_sys("events=");
+    putu_sys(event_count);
+    puts_sys(" idle=");
+    putu_sys(idle_heartbeats);
+    putc_sys('\n');
 }
 
 int main() {
-    // present();
-    draw_grid_demo();
+    unsigned event_count = 0;
+    unsigned idle_heartbeats = 0;
+
+    puts_sys("snake poll test: press keys, q to exit\n");
+    print_status(event_count, idle_heartbeats);
 
     while (1) {
-        int event = syscall(SYS_getc, 0);
-        if (!event || !kbd_event_is_pressed(event)) {
+        int event = 0;
+        int has_event = syscall(SYS_poll, (int)&event);
+        if (has_event < 0) {
+            puts_sys("poll failed\n");
+            break;
+        }
+
+        if (has_event == 0) {
+            // Периодический вывод данных показывает, что цикл ожидания продолжает работать и не блокируется
+            if ((++idle_heartbeats & 0x3fffff) == 0) {
+                print_status(event_count, idle_heartbeats);
+            }
             continue;
         }
 
-        int key = kbd_event_keycode(event);
+        ++event_count;
+        print_status(event_count, idle_heartbeats);
+
+        if (!kbd_event_is_pressed(event)) {
+            continue;
+        }
+
+        int key = (int)kbd_event_keycode(event);
         if (key == 'q' || key == 'Q') {
-            syscall(SYS_leave13h, 0);
             break;
         }
     }
