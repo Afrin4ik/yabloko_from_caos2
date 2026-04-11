@@ -115,7 +115,7 @@ LDFLAGS=-m elf_i386
 user/%: user/%.o user/crt.o
 	$(LD) $(LDFLAGS) -o $@ -Ttext 0x401000 $^
 
-user/snake: user/snake.o user/lib/gfx.o user/crt.o
+user/snake: user/snake.o user/snake_game/snake_input.o user/lib/gfx.o user/crt.o
 	$(LD) $(LDFLAGS) -o $@ -Ttext 0x401000 $^
 
 kernel.bin: $(OBJECTS)
