@@ -56,7 +56,7 @@ static void print_state(const snake_input_t* input, unsigned event_count, unsign
     puts_sys(" dir=");
     puts_sys(dir_name(snake_input_current_dir(input)));
 
-    puts_sys(" q=");
+    puts_sys(" queue_size=");
     putu_sys((unsigned)snake_input_queue_size(input));
 
     puts_sys(" held[");
@@ -68,16 +68,25 @@ static void print_state(const snake_input_t* input, unsigned event_count, unsign
     puts_sys("]\n");
 }
 
+static uint64_t now_ms(void) {
+    uint64_t now = 0;
+    if (syscall(SYS_time_ms, (int)&now) != 0) {
+        return 0;
+    }
+    return now;
+}
+
 int main() {
     snake_input_t input;
     unsigned event_count = 0;
     unsigned tick_count = 0;
-    unsigned spin = 0;
     int paused = 0;
+    const int base_tick_ms = 120;
+    const int fast_tick_ms = 60;
 
     snake_input_init(&input, SNAKE_DIR_RIGHT);
 
-    puts_sys("snake input test\n");
+    puts_sys("SNAKE INPUT TEST\n");
     puts_sys("WASD: enqueue turns, Space: hold speed\n");
     puts_sys("P/Enter: pause toggle, R: restart, Q: quit\n");
     print_state(&input, event_count, tick_count, paused);
@@ -110,10 +119,13 @@ int main() {
             puts_sys(paused ? "pause on\n" : "pause off\n");
         }
 
-        // Имитация такта: за один такт может быть затрачен один ход из очереди, как в игровом цикле
-        if ((++spin & 0x3ffffu) != 0) {
-            continue;
+        int tick_ms = snake_input_is_held(&input, SNAKE_INPUT_KEY_SPEED) ? fast_tick_ms : base_tick_ms;
+        uint64_t before = now_ms();
+        if (syscall(SYS_sleep, tick_ms) != 0) {
+            puts_sys("sleep failed\n");
+            break;
         }
+        uint64_t after = now_ms();
 
         if (paused) {
             continue;
@@ -131,6 +143,9 @@ int main() {
         }
 
         if ((tick_count & 7u) == 0u) {
+            puts_sys("dt=");
+            putu_sys((unsigned)(after - before));
+            puts_sys("ms ");
             print_state(&input, event_count, tick_count, paused);
         }
     }

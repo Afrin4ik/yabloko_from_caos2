@@ -268,6 +268,15 @@ static int handle_time_ms(uint32_t user_time_ptr) {
     return 0;
 }
 
+static int handle_sleep(int32_t ms) {
+    if (ms < 0) {
+        return -1;
+    }
+
+    msleep(ms);
+    return 0;
+}
+
 static void handle_syscall(registers_t* r) {
     switch (r->eax) {
         case SYS_exit:
@@ -302,6 +311,9 @@ static void handle_syscall(registers_t* r) {
             break;
         case SYS_time_ms:
             r->eax = handle_time_ms(r->ebx);
+            break;
+        case SYS_sleep:
+            r->eax = handle_sleep((int32_t)r->ebx);
             break;
         default:
             printk("Unknown syscall\n");

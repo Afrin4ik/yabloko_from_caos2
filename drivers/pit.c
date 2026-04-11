@@ -52,8 +52,6 @@ struct pit_command_t {
     unsigned char select_channel : 2;
 } __attribute__((packed));
 
-static void dec_sleep_counter(void);
-
 uint64_t pit_monotonic_ms(void) {
     enum {
         EFLAGS_IF = 1u << 9
@@ -82,20 +80,15 @@ void init_pit() {
     port_byte_out(0x40, (PIT_PROGRAM_REG & 0xff00) >> 8);
 
     register_interrupt_handler(IRQ0, timer_interrupt_handler);
-    add_timer_callback(dec_sleep_counter);
-}
-
-static int sleep_counter = 0;
-
-static void dec_sleep_counter(void) {
-    if (sleep_counter > 0) {
-        sleep_counter--;
-    }
 }
 
 void msleep(int ms) {
-    sleep_counter = ms / 10;
-    while (sleep_counter > 0) {
-        asm("hlt");
+    if (ms <= 0) {
+        return;
+    }
+
+    uint64_t deadline = pit_monotonic_ms() + (uint64_t)ms;
+    while (pit_monotonic_ms() < deadline) {
+        asm volatile("hlt" ::: "memory");
     }
 }
