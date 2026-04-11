@@ -9,6 +9,7 @@
 #include "../lib/string.h"
 #include "../drivers/mode13fb.h"
 #include "../drivers/keyboard.h"
+#include "../drivers/pit.h"
 #include "../drivers/port.h"
 #include "../drivers/vga.h"
 #include "../console.h"
@@ -258,6 +259,15 @@ static int handle_poll(uint32_t user_event_ptr) {
     return 1;
 }
 
+static int handle_time_ms(uint32_t user_time_ptr) {
+    if (user_writable_after(user_time_ptr) < (int)sizeof(uint64_t)) {
+        return -1;
+    }
+
+    *(uint64_t*)user_time_ptr = pit_monotonic_ms();
+    return 0;
+}
+
 static void handle_syscall(registers_t* r) {
     switch (r->eax) {
         case SYS_exit:
@@ -289,6 +299,9 @@ static void handle_syscall(registers_t* r) {
             break;
         case SYS_poll:
             r->eax = handle_poll(r->ebx);
+            break;
+        case SYS_time_ms:
+            r->eax = handle_time_ms(r->ebx);
             break;
         default:
             printk("Unknown syscall\n");

@@ -110,7 +110,7 @@ int main() {
             puts_sys(paused ? "pause on\n" : "pause off\n");
         }
 
-        // Synthetic tick: one queued turn can be consumed per tick, like in the game loop.
+        // Имитация такта: за один такт может быть затрачен один ход из очереди, как в игровом цикле
         if ((++spin & 0x3ffffu) != 0) {
             continue;
         }

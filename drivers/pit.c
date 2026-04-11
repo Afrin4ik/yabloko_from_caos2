@@ -27,6 +27,7 @@ enum {
 
 static timer_callback callbacks[100];
 static int registered_callbacks = 0;
+static volatile uint64_t monotonic_ms = 0;
 
 void add_timer_callback(timer_callback tc) {
     if (registered_callbacks >= (int)(sizeof(callbacks) / sizeof(callbacks[0]))) {
@@ -36,6 +37,9 @@ void add_timer_callback(timer_callback tc) {
 }
 
 static void timer_interrupt_handler(registers_t *r) {
+    (void)r;
+    monotonic_ms += (1000u / CLOCK_PRECISION_HZ);
+
     for (int i = 0; i < registered_callbacks; ++i) {
         callbacks[i]();
     }
@@ -49,6 +53,22 @@ struct pit_command_t {
 } __attribute__((packed));
 
 static void dec_sleep_counter(void);
+
+uint64_t pit_monotonic_ms(void) {
+    enum {
+        EFLAGS_IF = 1u << 9
+    };
+    uint32_t eflags;
+    uint64_t ms;
+
+    asm volatile("pushf; pop %0" : "=r"(eflags));
+    cli();
+    ms = monotonic_ms;
+    if (eflags & EFLAGS_IF) {
+        sti();
+    }
+    return ms;
+}
 
 void init_pit() {
     struct pit_command_t cmd = {
@@ -68,7 +88,9 @@ void init_pit() {
 static int sleep_counter = 0;
 
 static void dec_sleep_counter(void) {
-    sleep_counter--;
+    if (sleep_counter > 0) {
+        sleep_counter--;
+    }
 }
 
 void msleep(int ms) {
