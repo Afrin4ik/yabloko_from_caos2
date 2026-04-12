@@ -31,6 +31,7 @@ typedef struct {
     uint8_t held_keys;
     uint8_t pending_actions;
     uint8_t committed_dir;
+    uint8_t turn_queue_enabled;
 
     uint8_t queue_head;
     uint8_t queue_size;
@@ -42,5 +43,5 @@ int snake_input_poll(snake_input_t* input);
 int snake_input_pop_turn(snake_input_t* input, snake_dir_t* out_dir);
 int snake_input_is_held(const snake_input_t* input, uint8_t key_mask);
 int snake_input_take_action(snake_input_t* input, uint8_t action_mask);
-snake_dir_t snake_input_current_dir(const snake_input_t* input);
-int snake_input_queue_size(const snake_input_t* input);
+void snake_input_set_turn_queue_enabled(snake_input_t* input, int enabled);
+void snake_input_clear_turn_queue(snake_input_t* input);

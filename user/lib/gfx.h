@@ -10,4 +10,4 @@ enum {
 
 void clear(uint8_t color);
 void draw_cell(int x, int y, uint8_t color);
-void present(void);
+int present(void);

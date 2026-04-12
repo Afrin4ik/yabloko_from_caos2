@@ -133,10 +133,10 @@ uintptr_t user_readable_after(uintptr_t ptr) {
 
 void trap(registers_t *r) {
     // EOI
-    if (r->int_no >= 40) {
+    if (r->int_no >= IRQ8 && r->int_no <= IRQ15) {
         port_byte_out(0xA0, 0x20); /* follower */
     }
-    if (r->int_no >= 32) {
+    if (r->int_no >= IRQ0 && r->int_no <= IRQ15) {
         port_byte_out(0x20, 0x20); /* leader */
     }
 

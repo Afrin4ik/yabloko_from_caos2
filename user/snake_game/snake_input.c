@@ -8,6 +8,10 @@ static int snake_input_is_opposite(snake_dir_t a, snake_dir_t b) {
 }
 
 static int snake_input_enqueue_turn(snake_input_t* input, snake_dir_t dir) {
+    if (!input->turn_queue_enabled) {
+        return 0;
+    }
+
     snake_dir_t tail_dir = (snake_dir_t)input->committed_dir;
 
     if (input->queue_size > 0) {
@@ -55,6 +59,7 @@ void snake_input_init(snake_input_t* input, snake_dir_t initial_dir) {
     input->held_keys = 0;
     input->pending_actions = 0;
     input->committed_dir = (uint8_t)initial_dir;
+    input->turn_queue_enabled = 1;
     input->queue_head = 0;
     input->queue_size = 0;
 }
@@ -138,10 +143,15 @@ int snake_input_take_action(snake_input_t* input, uint8_t action_mask) {
     return is_set;
 }
 
-snake_dir_t snake_input_current_dir(const snake_input_t* input) {
-    return (snake_dir_t)input->committed_dir;
+void snake_input_set_turn_queue_enabled(snake_input_t* input, int enabled) {
+    input->turn_queue_enabled = enabled ? 1 : 0;
+    if (!enabled) {
+        input->queue_head = 0;
+        input->queue_size = 0;
+    }
 }
 
-int snake_input_queue_size(const snake_input_t* input) {
-    return input->queue_size;
+void snake_input_clear_turn_queue(snake_input_t* input) {
+    input->queue_head = 0;
+    input->queue_size = 0;
 }

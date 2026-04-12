@@ -1,154 +1,120 @@
 #include "../syscall.h"
+#include "lib/gfx.h"
 #include "snake_game/snake_input.h"
-
-static void putc_sys(char c) {
-    syscall(SYS_putc, c);
-}
-
-static void puts_sys(const char* s) {
-    syscall(SYS_puts, (int)s);
-}
-
-static void putu_sys(unsigned value) {
-    char buf[11];
-    unsigned i = 0;
-
-    if (value == 0) {
-        putc_sys('0');
-        return;
-    }
-
-    while (value > 0) {
-        buf[i++] = (char)('0' + (value % 10));
-        value /= 10;
-    }
-
-    while (i > 0) {
-        putc_sys(buf[--i]);
-    }
-}
-
-static const char* dir_name(snake_dir_t dir) {
-    switch (dir) {
-        case SNAKE_DIR_UP:
-            return "UP";
-        case SNAKE_DIR_RIGHT:
-            return "RIGHT";
-        case SNAKE_DIR_DOWN:
-            return "DOWN";
-        case SNAKE_DIR_LEFT:
-            return "LEFT";
-        default:
-            return "?";
-    }
-}
-
-static void print_state(const snake_input_t* input, unsigned event_count, unsigned tick_count, int paused) {
-    puts_sys("events=");
-    putu_sys(event_count);
-
-    puts_sys(" ticks=");
-    putu_sys(tick_count);
-
-    puts_sys(" paused=");
-    putu_sys(paused ? 1u : 0u);
-
-    puts_sys(" dir=");
-    puts_sys(dir_name(snake_input_current_dir(input)));
-
-    puts_sys(" queue_size=");
-    putu_sys((unsigned)snake_input_queue_size(input));
-
-    puts_sys(" held[");
-    putc_sys(snake_input_is_held(input, SNAKE_INPUT_KEY_UP) ? 'W' : '.');
-    putc_sys(snake_input_is_held(input, SNAKE_INPUT_KEY_LEFT) ? 'A' : '.');
-    putc_sys(snake_input_is_held(input, SNAKE_INPUT_KEY_DOWN) ? 'S' : '.');
-    putc_sys(snake_input_is_held(input, SNAKE_INPUT_KEY_RIGHT) ? 'D' : '.');
-    putc_sys(snake_input_is_held(input, SNAKE_INPUT_KEY_SPEED) ? ' ' : '.');
-    puts_sys("]\n");
-}
-
-static uint64_t now_ms(void) {
-    uint64_t now = 0;
-    if (syscall(SYS_time_ms, (int)&now) != 0) {
-        return 0;
-    }
-    return now;
-}
+#include "snake_game/snake_model.h"
+#include "snake_game/snake_render.h"
+#include "snake_game/snake_runtime.h"
 
 int main() {
     snake_input_t input;
-    unsigned event_count = 0;
-    unsigned tick_count = 0;
+    snake_model_t model;
+    const uint16_t initial_length = 5;
+    snake_dir_t initial_dir = SNAKE_DIR_RIGHT;
+    const uint64_t base_tick_ms = 120;
+    const uint64_t fast_tick_ms = 60;
+    const uint64_t frame_time_cap_ms = 50;
+    uint64_t accumulator_ms = 0;
+    uint64_t last_time_ms;
+    int alive = 1;
     int paused = 0;
-    const int base_tick_ms = 120;
-    const int fast_tick_ms = 60;
 
-    snake_input_init(&input, SNAKE_DIR_RIGHT);
+    snake_input_init(&input, initial_dir);
+    snake_model_init_center(&model, initial_dir, initial_length);
 
-    puts_sys("SNAKE INPUT TEST\n");
-    puts_sys("WASD: enqueue turns, Space: hold speed\n");
-    puts_sys("P/Enter: pause toggle, R: restart, Q: quit\n");
-    print_state(&input, event_count, tick_count, paused);
+    snake_runtime_log("SNAKE MINI-LOG\n");
+
+    if ((int)GFX_GRID_WIDTH != (int)SNAKE_FIELD_WIDTH || (int)GFX_GRID_HEIGHT != (int)SNAKE_FIELD_HEIGHT) {
+        snake_runtime_log("grid mismatch\n");
+        return 1;
+    }
+
+    last_time_ms = snake_runtime_now_ms();
+    snake_render_full(&model);
+    if (snake_runtime_present() != 0) {
+        return 1;
+    }
 
     while (1) {
         int processed = snake_input_poll(&input);
         if (processed < 0) {
-            puts_sys("poll failed\n");
+            snake_runtime_log("poll failed\n");
             break;
-        }
-        if (processed > 0) {
-            event_count += (unsigned)processed;
-            print_state(&input, event_count, tick_count, paused);
         }
 
         if (snake_input_take_action(&input, SNAKE_INPUT_ACTION_QUIT)) {
-            puts_sys("quit\n");
+            snake_runtime_log("quit\n");
             break;
         }
 
         if (snake_input_take_action(&input, SNAKE_INPUT_ACTION_RESTART)) {
-            snake_input_init(&input, SNAKE_DIR_RIGHT);
+            snake_input_init(&input, initial_dir);
+            snake_model_init_center(&model, initial_dir, initial_length);
+            alive = 1;
             paused = 0;
-            puts_sys("restart\n");
-            print_state(&input, event_count, tick_count, paused);
+            accumulator_ms = 0;
+            last_time_ms = snake_runtime_now_ms();
+            snake_runtime_log("restart\n");
+            snake_render_full(&model);
+            if (snake_runtime_present() != 0) {
+                break;
+            }
         }
 
         if (snake_input_take_action(&input, SNAKE_INPUT_ACTION_PAUSE_TOGGLE)) {
             paused = !paused;
-            puts_sys(paused ? "pause on\n" : "pause off\n");
+            accumulator_ms = 0;
+            last_time_ms = snake_runtime_now_ms();
+            snake_input_set_turn_queue_enabled(&input, !paused);
+            if (paused) {
+                snake_input_clear_turn_queue(&input);
+            }
+            snake_runtime_log(paused ? "pause on\n" : "pause off\n");
         }
 
-        int tick_ms = snake_input_is_held(&input, SNAKE_INPUT_KEY_SPEED) ? fast_tick_ms : base_tick_ms;
-        uint64_t before = now_ms();
-        if (syscall(SYS_sleep, tick_ms) != 0) {
-            puts_sys("sleep failed\n");
+        uint64_t tick_ms = snake_input_is_held(&input, SNAKE_INPUT_KEY_SPEED) ? fast_tick_ms : base_tick_ms;
+
+        uint64_t current_time_ms = snake_runtime_now_ms();
+        uint64_t elapsed_ms = current_time_ms - last_time_ms;
+        last_time_ms = current_time_ms;
+        if (elapsed_ms > frame_time_cap_ms) {
+            elapsed_ms = frame_time_cap_ms;
+        }
+
+        if (!paused) {
+            accumulator_ms += elapsed_ms;
+        }
+
+        while (!paused && alive && accumulator_ms >= tick_ms) {
+            snake_dir_t tick_dir = model.dir;
+            snake_dir_t queued_dir;
+            snake_cell_t prev_head = model.head;
+            snake_cell_t prev_tail = model.tail;
+
+            if (snake_input_pop_turn(&input, &queued_dir)) {
+                tick_dir = queued_dir;
+            }
+
+            if (!snake_model_step_no_growth(&model, tick_dir)) {
+                alive = 0;
+                snake_runtime_log("game over\n");
+            } else {
+                snake_render_step(&model, prev_head, prev_tail);
+            }
+
+            accumulator_ms -= tick_ms;
+        }
+
+        if (snake_runtime_present() != 0) {
             break;
         }
-        uint64_t after = now_ms();
 
-        if (paused) {
-            continue;
-        }
-
-        ++tick_count;
-
-        {
-            snake_dir_t turned_dir;
-            if (snake_input_pop_turn(&input, &turned_dir)) {
-                puts_sys("tick turn -> ");
-                puts_sys(dir_name(turned_dir));
-                putc_sys('\n');
-            }
-        }
-
-        if ((tick_count & 7u) == 0u) {
-            puts_sys("dt=");
-            putu_sys((unsigned)(after - before));
-            puts_sys("ms ");
-            print_state(&input, event_count, tick_count, paused);
+        if (syscall(SYS_sleep, 1) != 0) {
+            snake_runtime_log("sleep failed\n");
+            break;
         }
     }
+
+    syscall(SYS_leave13h, 0);
 
     return 0;
 }
