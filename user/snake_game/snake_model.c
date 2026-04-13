@@ -1,5 +1,17 @@
 #include "snake_model.h"
 
+static uint32_t snake_model_rand_u32(snake_model_t* model) {
+    uint32_t x = model->rng_state;
+    if (x == 0) {
+        x = 0x9E3779B9u;
+    }
+    x ^= x << 13;
+    x ^= x >> 17;
+    x ^= x << 5;
+    model->rng_state = x;
+    return x;
+}
+
 static int wrap_coord(int value, int limit) {
     int wrapped = value % limit;
     if (wrapped < 0) {
@@ -55,6 +67,9 @@ void snake_model_init_center(snake_model_t* model, snake_dir_t initial_dir, uint
 
     model->dir = initial_dir;
     model->length = initial_length;
+    model->has_apple = 0;
+    model->apple.x = 0;
+    model->apple.y = 0;
 
     snake_model_clear_occupancy(model);
 
@@ -69,6 +84,43 @@ void snake_model_init_center(snake_model_t* model, snake_dir_t initial_dir, uint
 
     model->head = model->body[0];
     model->tail = model->body[model->length - 1];
+}
+
+void snake_model_seed_random(snake_model_t* model, uint32_t seed) {
+    model->rng_state = seed;
+    if (model->rng_state == 0) {
+        model->rng_state = 0xA341316Cu;
+    }
+}
+
+int snake_model_spawn_apple(snake_model_t* model) {
+    const int total_cells = SNAKE_FIELD_WIDTH * SNAKE_FIELD_HEIGHT;
+    int free_cells = total_cells - (int)model->length;
+
+    if (free_cells <= 0) {
+        model->has_apple = 0;
+        return 0;
+    }
+
+    int target = (int)(snake_model_rand_u32(model) % (uint32_t)free_cells);
+
+    for (int y = 0; y < SNAKE_FIELD_HEIGHT; ++y) {
+        for (int x = 0; x < SNAKE_FIELD_WIDTH; ++x) {
+            if (model->occupancy[y][x] != 0) {
+                continue;
+            }
+            if (target == 0) {
+                model->apple.x = (uint8_t)x;
+                model->apple.y = (uint8_t)y;
+                model->has_apple = 1;
+                return 1;
+            }
+            --target;
+        }
+    }
+
+    model->has_apple = 0;
+    return 0;
 }
 
 int snake_model_is_occupied(const snake_model_t* model, int x, int y) {

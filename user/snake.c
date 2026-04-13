@@ -20,6 +20,8 @@ int main() {
 
     snake_input_init(&input, initial_dir);
     snake_model_init_center(&model, initial_dir, initial_length);
+    snake_model_seed_random(&model, (uint32_t)snake_runtime_now_ms());
+    (void)snake_model_spawn_apple(&model);
 
     snake_runtime_log("SNAKE MINI-LOG\n");
 
@@ -49,6 +51,8 @@ int main() {
         if (snake_input_take_action(&input, SNAKE_INPUT_ACTION_RESTART)) {
             snake_input_init(&input, initial_dir);
             snake_model_init_center(&model, initial_dir, initial_length);
+            snake_model_seed_random(&model, (uint32_t)snake_runtime_now_ms());
+            (void)snake_model_spawn_apple(&model);
             alive = 1;
             paused = 0;
             accumulator_ms = 0;
@@ -98,6 +102,10 @@ int main() {
                 alive = 0;
                 snake_runtime_log("game over\n");
             } else {
+                if (model.has_apple && model.head.x == model.apple.x && model.head.y == model.apple.y) {
+                    model.has_apple = 0;
+                    (void)snake_model_spawn_apple(&model);
+                }
                 snake_render_step(&model, prev_head, prev_tail);
             }
 
