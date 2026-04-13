@@ -11,11 +11,72 @@ enum {
     SNAKE_COLOR_TAIL = 10,
     SNAKE_COLOR_HEAD = 12,
     SNAKE_COLOR_TEXT = 15,
+    SNAKE_SCORE_X = 4,
+    SNAKE_SCORE_Y = 4,
+    SNAKE_SCORE_W = 74,
+    SNAKE_SCORE_H = 9,
 };
 
 static void snake_render_panel(int x, int y, int width, int height) {
     fill_rect(x, y, width, height, SNAKE_COLOR_PANEL);
     fill_rect(x + 4, y + 4, width - 8, height - 8, SNAKE_COLOR_BACKGROUND);
+}
+
+static int snake_u16_to_string(uint16_t value, char* out, int out_size) {
+    char reverse[5];
+    int count = 0;
+
+    if (!out || out_size <= 1) {
+        return 0;
+    }
+
+    if (value == 0) {
+        if (out_size < 2) {
+            return 0;
+        }
+        out[0] = '0';
+        out[1] = '\0';
+        return 1;
+    }
+
+    while (value > 0 && count < (int)sizeof(reverse)) {
+        reverse[count++] = (char)('0' + (value % 10));
+        value = (uint16_t)(value / 10);
+    }
+
+    if (count + 1 > out_size) {
+        return 0;
+    }
+
+    for (int i = 0; i < count; ++i) {
+        out[i] = reverse[count - 1 - i];
+    }
+    out[count] = '\0';
+
+    return count;
+}
+
+static void snake_render_score(const snake_model_t* model) {
+    char score_digits[6];
+    char score_text[12] = "SCORE ";
+    int digits_len;
+
+    if (!model) {
+        return;
+    }
+
+    digits_len = snake_u16_to_string(model->score, score_digits, (int)sizeof(score_digits));
+    if (digits_len <= 0) {
+        return;
+    }
+
+    for (int i = 0; i < digits_len; ++i) {
+        score_text[6 + i] = score_digits[i];
+    }
+    score_text[6 + digits_len] = '\0';
+
+    fill_rect(SNAKE_SCORE_X, SNAKE_SCORE_Y, SNAKE_SCORE_W, SNAKE_SCORE_H, SNAKE_COLOR_BACKGROUND);
+    draw_text(SNAKE_SCORE_X + 1, SNAKE_SCORE_Y + 1, SNAKE_COLOR_TEXT, score_text, 1);
 }
 
 void snake_render_menu(void) {
@@ -57,6 +118,7 @@ void snake_render_full(const snake_model_t* model) {
 
     draw_cell((int)model->tail.x, (int)model->tail.y, SNAKE_COLOR_TAIL);
     draw_cell((int)model->head.x, (int)model->head.y, SNAKE_COLOR_HEAD);
+    snake_render_score(model);
 }
 
 void snake_render_pause(const snake_model_t* model) {
@@ -90,4 +152,5 @@ void snake_render_step(const snake_model_t* model, snake_cell_t prev_head, snake
     draw_cell((int)prev_head.x, (int)prev_head.y, SNAKE_COLOR_BODY);
     draw_cell((int)model->tail.x, (int)model->tail.y, SNAKE_COLOR_TAIL);
     draw_cell((int)model->head.x, (int)model->head.y, SNAKE_COLOR_HEAD);
+    snake_render_score(model);
 }

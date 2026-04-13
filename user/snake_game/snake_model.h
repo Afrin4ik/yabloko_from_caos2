@@ -20,6 +20,7 @@ typedef struct {
 typedef struct {
     snake_dir_t dir;
     uint16_t length;
+    uint16_t score;
     uint32_t rng_state;
 
     snake_cell_t head;

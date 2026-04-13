@@ -196,6 +196,7 @@ void snake_model_init_center(snake_model_t* model, snake_dir_t initial_dir, uint
 
     model->dir = initial_dir;
     model->length = initial_length;
+    model->score = 0;
     model->apple_count = 0;
     model->growth_head = 0;
     model->growth_count = 0;
@@ -294,6 +295,7 @@ int snake_model_try_consume_apple(snake_model_t* model) {
         model->apples[i] = model->apples[i + 1];
     }
     model->apple_count--;
+    model->score++;
 
     (void)snake_model_enqueue_growth_point(model, consumed_apple);
     return 1;

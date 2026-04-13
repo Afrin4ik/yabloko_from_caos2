@@ -35,6 +35,19 @@ static const uint8_t font_5x7[26][7] = {
     {0x1f, 0x01, 0x02, 0x04, 0x08, 0x10, 0x1f},
 };
 
+static const uint8_t font_5x7_digits[10][7] = {
+    {0x0e, 0x11, 0x13, 0x15, 0x19, 0x11, 0x0e},
+    {0x04, 0x0c, 0x04, 0x04, 0x04, 0x04, 0x0e},
+    {0x0e, 0x11, 0x01, 0x02, 0x04, 0x08, 0x1f},
+    {0x1e, 0x01, 0x01, 0x0e, 0x01, 0x01, 0x1e},
+    {0x02, 0x06, 0x0a, 0x12, 0x1f, 0x02, 0x02},
+    {0x1f, 0x10, 0x10, 0x1e, 0x01, 0x01, 0x1e},
+    {0x0e, 0x10, 0x10, 0x1e, 0x11, 0x11, 0x0e},
+    {0x1f, 0x01, 0x02, 0x04, 0x08, 0x08, 0x08},
+    {0x0e, 0x11, 0x11, 0x0e, 0x11, 0x11, 0x0e},
+    {0x0e, 0x11, 0x11, 0x0f, 0x01, 0x01, 0x0e},
+};
+
 static int font_index(char ch) {
     if (ch >= 'a' && ch <= 'z') {
         ch = (char)(ch - 'a' + 'A');
@@ -42,6 +55,10 @@ static int font_index(char ch) {
 
     if (ch >= 'A' && ch <= 'Z') {
         return ch - 'A';
+    }
+
+    if (ch >= '0' && ch <= '9') {
+        return 26 + (ch - '0');
     }
 
     return -1;
@@ -118,11 +135,17 @@ void draw_cell(int x, int y, uint8_t color) {
 
 static void draw_glyph(int x, int y, uint8_t color, char ch, int scale) {
     int index = font_index(ch);
+    const uint8_t* glyph = 0;
     if (index < 0 || scale <= 0) {
         return;
     }
 
-    const uint8_t* glyph = font_5x7[index];
+    if (index < 26) {
+        glyph = font_5x7[index];
+    } else {
+        glyph = font_5x7_digits[index - 26];
+    }
+
     for (int row = 0; row < 7; ++row) {
         uint8_t bits = glyph[row];
         for (int col = 0; col < 5; ++col) {
