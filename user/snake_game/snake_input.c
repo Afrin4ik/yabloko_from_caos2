@@ -88,6 +88,11 @@ int snake_input_poll(snake_input_t* input) {
 
             if (pressed) {
                 input->held_keys |= key_mask;
+                if (dir == SNAKE_DIR_LEFT) {
+                    input->pending_actions |= SNAKE_INPUT_ACTION_MENU_APPLES_DEC;
+                } else if (dir == SNAKE_DIR_RIGHT) {
+                    input->pending_actions |= SNAKE_INPUT_ACTION_MENU_APPLES_INC;
+                }
                 snake_input_enqueue_turn(input, dir);
             } else {
                 input->held_keys &= (uint8_t)~key_mask;

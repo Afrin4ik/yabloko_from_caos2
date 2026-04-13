@@ -56,6 +56,10 @@ static int snake_u16_to_string(uint16_t value, char* out, int out_size) {
     return count;
 }
 
+static int snake_u8_to_string(uint8_t value, char* out, int out_size) {
+    return snake_u16_to_string((uint16_t)value, out, out_size);
+}
+
 static void snake_render_score(const snake_model_t* model) {
     char score_digits[6];
     char score_text[12] = "SCORE ";
@@ -80,7 +84,19 @@ static void snake_render_score(const snake_model_t* model) {
     draw_text(SNAKE_SCORE_X + 4, SNAKE_SCORE_Y + 3, SNAKE_COLOR_TEXT, score_text, 1);
 }
 
-void snake_render_menu(void) {
+void snake_render_menu(uint8_t apple_count) {
+    char apple_digits[4];
+    char apple_text[16] = "APPLES ";
+    int digits_len;
+
+    digits_len = snake_u8_to_string(apple_count, apple_digits, (int)sizeof(apple_digits));
+    if (digits_len > 0) {
+        for (int i = 0; i < digits_len; ++i) {
+            apple_text[7 + i] = apple_digits[i];
+        }
+        apple_text[7 + digits_len] = '\0';
+    }
+
     clear(SNAKE_COLOR_BACKGROUND);
 
     fill_rect(0, 0, 320, 8, SNAKE_COLOR_PANEL);
@@ -90,12 +106,14 @@ void snake_render_menu(void) {
 
     snake_render_panel(34, 24, 252, 152);
 
-    draw_text_centered(36, SNAKE_COLOR_TEXT, "YABLOKO SNAKE", 3);
-    draw_text_centered(76, SNAKE_COLOR_TEXT, "ENTER OR R TO START", 2);
-    draw_text_centered(100, SNAKE_COLOR_TEXT, "WASD MOVE", 2);
-    draw_text_centered(122, SNAKE_COLOR_TEXT, "SPACE SPEED", 2);
-    draw_text_centered(144, SNAKE_COLOR_TEXT, "P PAUSE OR RESUME", 2);
-    draw_text_centered(162, SNAKE_COLOR_TEXT, "Q EXIT TO CONSOLE", 1);
+    draw_text_centered(34, SNAKE_COLOR_TEXT, "YABLOKO SNAKE", 3);
+    draw_text_centered(72, SNAKE_COLOR_TEXT, "ENTER OR R TO START", 2);
+    draw_text_centered(98, SNAKE_COLOR_TEXT, "A D APPLES", 1);
+    draw_text_centered(110, SNAKE_COLOR_TEXT, apple_text, 1);
+    draw_text_centered(126, SNAKE_COLOR_TEXT, "WASD MOVE", 2);
+    draw_text_centered(146, SNAKE_COLOR_TEXT, "SPACE SPEED", 1);
+    draw_text_centered(156, SNAKE_COLOR_TEXT, "P PAUSE OR RESUME", 1);
+    draw_text_centered(166, SNAKE_COLOR_TEXT, "Q EXIT TO CONSOLE", 1);
 }
 
 void snake_render_full(const snake_model_t* model) {

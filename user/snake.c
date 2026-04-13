@@ -7,7 +7,7 @@
 
 enum {
     SNAKE_INITIAL_LENGTH = 5,
-    SNAKE_TARGET_APPLE_COUNT = 5,
+    SNAKE_DEFAULT_APPLE_COUNT = 5,
     SNAKE_TARGET_OBSTACLE_COUNT = 10,
     SNAKE_BASE_TICK_MS = 120,
     SNAKE_FAST_TICK_MS = 60,
@@ -30,9 +30,28 @@ typedef struct {
     int paused;
     uint64_t accumulator_ms;
     uint64_t last_time_ms;
+    uint8_t target_apple_count;
 } snake_game_state_t;
 
+static uint8_t snake_effective_apple_target(const snake_model_t* model, uint8_t requested) {
+    int free_for_apples = (SNAKE_FIELD_WIDTH * SNAKE_FIELD_HEIGHT) - (int)model->length - (int)model->obstacle_count;
+    int max_target = SNAKE_MAX_APPLES;
+
+    if (free_for_apples < 0) {
+        free_for_apples = 0;
+    }
+    if (free_for_apples < max_target) {
+        max_target = free_for_apples;
+    }
+
+    if ((int)requested > max_target) {
+        return (uint8_t)max_target;
+    }
+    return requested;
+}
+
 static void snake_fill_apples(snake_model_t* model, uint8_t target_apple_count) {
+    target_apple_count = snake_effective_apple_target(model, target_apple_count);
     while (model->apple_count < target_apple_count && snake_model_spawn_apple(model)) {
     }
 }
@@ -53,14 +72,14 @@ static void snake_reset_game(snake_game_state_t* state, snake_dir_t initial_dir,
 }
 
 static void snake_start_game(snake_game_state_t* state, snake_dir_t initial_dir) {
-    snake_reset_game(state, initial_dir, SNAKE_INITIAL_LENGTH, SNAKE_TARGET_APPLE_COUNT);
+    snake_reset_game(state, initial_dir, SNAKE_INITIAL_LENGTH, state->target_apple_count);
     state->phase = SNAKE_PHASE_GAME;
     snake_render_full(&state->model);
 }
 
 static void snake_show_menu(snake_game_state_t* state) {
     state->phase = SNAKE_PHASE_MENU;
-    snake_render_menu();
+    snake_render_menu(state->target_apple_count);
 }
 
 static void snake_show_game_over(snake_game_state_t* state) {
@@ -74,6 +93,7 @@ int main(void) {
     int exit_code = 0;
 
     snake_input_init(&state.input, initial_dir);
+    state.target_apple_count = SNAKE_DEFAULT_APPLE_COUNT;
     snake_show_menu(&state);
 
     snake_runtime_log("SNAKE MINI-LOG\n");
@@ -101,6 +121,29 @@ int main(void) {
         }
 
         if (state.phase == SNAKE_PHASE_MENU) {
+            int menu_changed = 0;
+
+            if (snake_input_take_action(&state.input, SNAKE_INPUT_ACTION_MENU_APPLES_DEC)) {
+                if (state.target_apple_count > 1) {
+                    state.target_apple_count--;
+                    menu_changed = 1;
+                }
+            }
+            if (snake_input_take_action(&state.input, SNAKE_INPUT_ACTION_MENU_APPLES_INC)) {
+                if (state.target_apple_count < SNAKE_MAX_APPLES) {
+                    state.target_apple_count++;
+                    menu_changed = 1;
+                }
+            }
+
+            if (menu_changed) {
+                snake_render_menu(state.target_apple_count);
+                if (snake_runtime_present() != 0) {
+                    exit_code = 1;
+                    break;
+                }
+            }
+
             if (snake_input_take_action(&state.input, SNAKE_INPUT_ACTION_RESTART) ||
                 snake_input_take_action(&state.input, SNAKE_INPUT_ACTION_CONFIRM)) {
                 snake_runtime_log("start\n");
@@ -199,7 +242,7 @@ int main(void) {
             } else {
                 if (snake_model_try_consume_apple(&state.model)) {
                     snake_runtime_beep(SNAKE_EAT_BEEP_HZ, SNAKE_EAT_BEEP_MS);
-                    snake_fill_apples(&state.model, SNAKE_TARGET_APPLE_COUNT);
+                    snake_fill_apples(&state.model, state.target_apple_count);
                 }
                 snake_render_step(&state.model, prev_head, prev_tail);
             }
