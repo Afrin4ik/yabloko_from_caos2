@@ -6,16 +6,140 @@ enum {
     SNAKE_COLOR_PANEL = 7,
     SNAKE_COLOR_BACKGROUND = 8,
     SNAKE_COLOR_BODY = 2,
+    SNAKE_COLOR_BODY_ACCENT = 10,
     SNAKE_COLOR_APPLE = 4,
+    SNAKE_COLOR_APPLE_ACCENT = 12,
+    SNAKE_COLOR_STEM = 6,
+    SNAKE_COLOR_LEAF = 2,
     SNAKE_COLOR_OBSTACLE = 7,
+    SNAKE_COLOR_OBSTACLE_ACCENT = 15,
+    SNAKE_COLOR_OBSTACLE_DARK = 8,
     SNAKE_COLOR_TAIL = 10,
     SNAKE_COLOR_HEAD = 12,
     SNAKE_COLOR_TEXT = 15,
+    SNAKE_COLOR_EYE = 0,
     SNAKE_SCORE_X = 4,
     SNAKE_SCORE_Y = 4,
     SNAKE_SCORE_W = 80,
     SNAKE_SCORE_H = 13,
 };
+
+static void snake_cell_to_pixels(int x, int y, int* px, int* py) {
+    *px = x * GFX_CELL_SIZE;
+    *py = y * GFX_CELL_SIZE;
+}
+
+static void snake_draw_body_cell(int x, int y) {
+    int px = 0;
+    int py = 0;
+    snake_cell_to_pixels(x, y, &px, &py);
+
+    draw_cell(x, y, SNAKE_COLOR_BACKGROUND);
+    fill_rect(px + 1, py + 1, 8, 8, SNAKE_COLOR_BODY);
+    fill_rect(px + 2, py + 2, 6, 6, SNAKE_COLOR_BODY_ACCENT);
+    fill_rect(px + 3, py + 3, 4, 4, SNAKE_COLOR_BODY);
+}
+
+static void snake_draw_tail_cell(int x, int y) {
+    int px = 0;
+    int py = 0;
+    snake_cell_to_pixels(x, y, &px, &py);
+
+    draw_cell(x, y, SNAKE_COLOR_BACKGROUND);
+    fill_rect(px + 2, py + 2, 6, 6, SNAKE_COLOR_TAIL);
+    fill_rect(px + 3, py + 3, 4, 4, SNAKE_COLOR_BODY);
+}
+
+static void snake_draw_head_cell(const snake_model_t* model, int x, int y) {
+    int px = 0;
+    int py = 0;
+    int eye1_x = 0;
+    int eye1_y = 0;
+    int eye2_x = 0;
+    int eye2_y = 0;
+
+    snake_cell_to_pixels(x, y, &px, &py);
+
+    eye1_x = px + 3;
+    eye1_y = py + 3;
+    eye2_x = px + 6;
+    eye2_y = py + 6;
+
+    draw_cell(x, y, SNAKE_COLOR_BACKGROUND);
+    fill_rect(px + 1, py + 1, 8, 8, SNAKE_COLOR_HEAD);
+    fill_rect(px + 2, py + 2, 6, 6, SNAKE_COLOR_BODY_ACCENT);
+
+    switch (model->dir) {
+        case SNAKE_DIR_UP:
+            eye1_x = px + 3;
+            eye1_y = py + 3;
+            eye2_x = px + 6;
+            eye2_y = py + 3;
+            fill_rect(px + 3, py + 1, 4, 2, SNAKE_COLOR_APPLE_ACCENT);
+            break;
+        case SNAKE_DIR_RIGHT:
+            eye1_x = px + 6;
+            eye1_y = py + 3;
+            eye2_x = px + 6;
+            eye2_y = py + 6;
+            fill_rect(px + 7, py + 3, 2, 4, SNAKE_COLOR_APPLE_ACCENT);
+            break;
+        case SNAKE_DIR_DOWN:
+            eye1_x = px + 3;
+            eye1_y = py + 6;
+            eye2_x = px + 6;
+            eye2_y = py + 6;
+            fill_rect(px + 3, py + 7, 4, 2, SNAKE_COLOR_APPLE_ACCENT);
+            break;
+        case SNAKE_DIR_LEFT:
+            eye1_x = px + 3;
+            eye1_y = py + 3;
+            eye2_x = px + 3;
+            eye2_y = py + 6;
+            fill_rect(px + 1, py + 3, 2, 4, SNAKE_COLOR_APPLE_ACCENT);
+            break;
+        default:
+            break;
+    }
+
+    fill_rect(eye1_x, eye1_y, 1, 1, SNAKE_COLOR_EYE);
+    fill_rect(eye2_x, eye2_y, 1, 1, SNAKE_COLOR_EYE);
+}
+
+static void snake_draw_apple_cell(int x, int y) {
+    int px = 0;
+    int py = 0;
+    snake_cell_to_pixels(x, y, &px, &py);
+
+    draw_cell(x, y, SNAKE_COLOR_BACKGROUND);
+
+    fill_rect(px + 4, py + 1, 1, 2, SNAKE_COLOR_STEM);
+    fill_rect(px + 5, py + 1, 2, 1, SNAKE_COLOR_LEAF);
+
+    fill_rect(px + 3, py + 2, 4, 1, SNAKE_COLOR_APPLE_ACCENT);
+    fill_rect(px + 2, py + 3, 6, 1, SNAKE_COLOR_APPLE);
+    fill_rect(px + 1, py + 4, 8, 3, SNAKE_COLOR_APPLE);
+    fill_rect(px + 2, py + 7, 6, 1, SNAKE_COLOR_APPLE);
+    fill_rect(px + 3, py + 8, 4, 1, SNAKE_COLOR_APPLE_ACCENT);
+    fill_rect(px + 3, py + 4, 2, 2, SNAKE_COLOR_APPLE_ACCENT);
+}
+
+static void snake_draw_obstacle_cell(int x, int y) {
+    int px = 0;
+    int py = 0;
+    snake_cell_to_pixels(x, y, &px, &py);
+
+    draw_cell(x, y, SNAKE_COLOR_BACKGROUND);
+    fill_rect(px + 1, py + 1, 8, 8, SNAKE_COLOR_OBSTACLE);
+    fill_rect(px + 2, py + 2, 6, 6, SNAKE_COLOR_OBSTACLE_DARK);
+
+    fill_rect(px + 2, py + 2, 5, 1, SNAKE_COLOR_OBSTACLE_ACCENT);
+    fill_rect(px + 2, py + 5, 6, 1, SNAKE_COLOR_OBSTACLE_ACCENT);
+    fill_rect(px + 3, py + 8, 5, 1, SNAKE_COLOR_OBSTACLE_ACCENT);
+
+    fill_rect(px + 4, py + 3, 1, 1, SNAKE_COLOR_OBSTACLE_ACCENT);
+    fill_rect(px + 6, py + 6, 1, 1, SNAKE_COLOR_OBSTACLE_ACCENT);
+}
 
 static void snake_render_panel(int x, int y, int width, int height) {
     fill_rect(x, y, width, height, SNAKE_COLOR_PANEL);
@@ -120,23 +244,23 @@ void snake_render_full(const snake_model_t* model) {
     clear(SNAKE_COLOR_BACKGROUND);
 
     for (uint8_t i = 0; i < model->obstacle_count; ++i) {
-        draw_cell((int)model->obstacles[i].x, (int)model->obstacles[i].y, SNAKE_COLOR_OBSTACLE);
+        snake_draw_obstacle_cell((int)model->obstacles[i].x, (int)model->obstacles[i].y);
     }
 
     for (uint8_t i = 0; i < model->apple_count; ++i) {
-        draw_cell((int)model->apples[i].x, (int)model->apples[i].y, SNAKE_COLOR_APPLE);
+        snake_draw_apple_cell((int)model->apples[i].x, (int)model->apples[i].y);
     }
 
     for (int y = 0; y < SNAKE_FIELD_HEIGHT; ++y) {
         for (int x = 0; x < SNAKE_FIELD_WIDTH; ++x) {
             if (snake_model_is_occupied(model, x, y)) {
-                draw_cell(x, y, SNAKE_COLOR_BODY);
+                snake_draw_body_cell(x, y);
             }
         }
     }
 
-    draw_cell((int)model->tail.x, (int)model->tail.y, SNAKE_COLOR_TAIL);
-    draw_cell((int)model->head.x, (int)model->head.y, SNAKE_COLOR_HEAD);
+    snake_draw_tail_cell((int)model->tail.x, (int)model->tail.y);
+    snake_draw_head_cell(model, (int)model->head.x, (int)model->head.y);
     snake_render_score(model);
 }
 
@@ -161,15 +285,17 @@ void snake_render_game_over(const snake_model_t* model) {
 
 void snake_render_step(const snake_model_t* model, snake_cell_t prev_head, snake_cell_t prev_tail) {
     for (uint8_t i = 0; i < model->apple_count; ++i) {
-        draw_cell((int)model->apples[i].x, (int)model->apples[i].y, SNAKE_COLOR_APPLE);
+        snake_draw_apple_cell((int)model->apples[i].x, (int)model->apples[i].y);
     }
-    draw_cell((int)prev_tail.x,
-              (int)prev_tail.y,
-              snake_model_has_obstacle(model, (int)prev_tail.x, (int)prev_tail.y)
-                  ? SNAKE_COLOR_OBSTACLE
-                  : SNAKE_COLOR_BACKGROUND);
-    draw_cell((int)prev_head.x, (int)prev_head.y, SNAKE_COLOR_BODY);
-    draw_cell((int)model->tail.x, (int)model->tail.y, SNAKE_COLOR_TAIL);
-    draw_cell((int)model->head.x, (int)model->head.y, SNAKE_COLOR_HEAD);
+
+    if (snake_model_has_obstacle(model, (int)prev_tail.x, (int)prev_tail.y)) {
+        snake_draw_obstacle_cell((int)prev_tail.x, (int)prev_tail.y);
+    } else {
+        draw_cell((int)prev_tail.x, (int)prev_tail.y, SNAKE_COLOR_BACKGROUND);
+    }
+
+    snake_draw_body_cell((int)prev_head.x, (int)prev_head.y);
+    snake_draw_tail_cell((int)model->tail.x, (int)model->tail.y);
+    snake_draw_head_cell(model, (int)model->head.x, (int)model->head.y);
     snake_render_score(model);
 }
