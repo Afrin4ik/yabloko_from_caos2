@@ -8,6 +8,7 @@ enum {
     SNAKE_FIELD_WIDTH = 32,
     SNAKE_FIELD_HEIGHT = 20,
     SNAKE_MAX_LENGTH = SNAKE_FIELD_WIDTH * SNAKE_FIELD_HEIGHT,
+    SNAKE_MAX_APPLES = 16,
 };
 
 typedef struct {
@@ -22,8 +23,8 @@ typedef struct {
 
     snake_cell_t head;
     snake_cell_t tail;
-    snake_cell_t apple;
-    uint8_t has_apple;
+    snake_cell_t apples[SNAKE_MAX_APPLES];
+    uint8_t apple_count;
 
     snake_cell_t growth_points[SNAKE_MAX_LENGTH];
     uint16_t growth_head;

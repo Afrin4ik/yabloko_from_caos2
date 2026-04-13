@@ -32,6 +32,15 @@ static int snake_model_cells_equal(snake_cell_t a, snake_cell_t b) {
     return a.x == b.x && a.y == b.y;
 }
 
+static int snake_model_find_apple_at(const snake_model_t* model, int x, int y) {
+    for (uint8_t i = 0; i < model->apple_count; ++i) {
+        if ((int)model->apples[i].x == x && (int)model->apples[i].y == y) {
+            return (int)i;
+        }
+    }
+    return -1;
+}
+
 static int snake_model_enqueue_growth_point(snake_model_t* model, snake_cell_t point) {
     if (model->growth_count >= SNAKE_MAX_LENGTH) {
         return 0;
@@ -94,9 +103,7 @@ void snake_model_init_center(snake_model_t* model, snake_dir_t initial_dir, uint
 
     model->dir = initial_dir;
     model->length = initial_length;
-    model->has_apple = 0;
-    model->apple.x = 0;
-    model->apple.y = 0;
+    model->apple_count = 0;
     model->growth_head = 0;
     model->growth_count = 0;
 
@@ -123,11 +130,14 @@ void snake_model_seed_random(snake_model_t* model, uint32_t seed) {
 }
 
 int snake_model_spawn_apple(snake_model_t* model) {
+    if (model->apple_count >= SNAKE_MAX_APPLES) {
+        return 0;
+    }
+
     const int total_cells = SNAKE_FIELD_WIDTH * SNAKE_FIELD_HEIGHT;
-    int free_cells = total_cells - (int)model->length;
+    int free_cells = total_cells - (int)model->length - (int)model->apple_count;
 
     if (free_cells <= 0) {
-        model->has_apple = 0;
         return 0;
     }
 
@@ -138,17 +148,19 @@ int snake_model_spawn_apple(snake_model_t* model) {
             if (model->occupancy[y][x] != 0) {
                 continue;
             }
+            if (snake_model_find_apple_at(model, x, y) >= 0) {
+                continue;
+            }
             if (target == 0) {
-                model->apple.x = (uint8_t)x;
-                model->apple.y = (uint8_t)y;
-                model->has_apple = 1;
+                model->apples[model->apple_count].x = (uint8_t)x;
+                model->apples[model->apple_count].y = (uint8_t)y;
+                model->apple_count++;
                 return 1;
             }
             --target;
         }
     }
 
-    model->has_apple = 0;
     return 0;
 }
 
@@ -160,15 +172,22 @@ int snake_model_is_occupied(const snake_model_t* model, int x, int y) {
 }
 
 int snake_model_try_consume_apple(snake_model_t* model) {
-    if (!model->has_apple) {
-        return 0;
-    }
-    if (!snake_model_cells_equal(model->head, model->apple)) {
+    if (model->apple_count == 0) {
         return 0;
     }
 
-    snake_cell_t consumed_apple = model->apple;
-    model->has_apple = 0;
+    int apple_index = snake_model_find_apple_at(model, (int)model->head.x, (int)model->head.y);
+    if (apple_index < 0) {
+        return 0;
+    }
+
+    snake_cell_t consumed_apple = model->apples[(uint8_t)apple_index];
+
+    for (uint8_t i = (uint8_t)apple_index; i + 1 < model->apple_count; ++i) {
+        model->apples[i] = model->apples[i + 1];
+    }
+    model->apple_count--;
+
     (void)snake_model_enqueue_growth_point(model, consumed_apple);
     return 1;
 }
