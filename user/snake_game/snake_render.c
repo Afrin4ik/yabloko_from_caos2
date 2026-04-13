@@ -3,18 +3,18 @@
 #include "../lib/gfx.h"
 
 enum {
-    SNAKE_COLOR_PANEL = 1,
-    SNAKE_COLOR_BACKGROUND = 0,
+    SNAKE_COLOR_PANEL = 7,
+    SNAKE_COLOR_BACKGROUND = 8,
     SNAKE_COLOR_BODY = 2,
     SNAKE_COLOR_APPLE = 4,
-    SNAKE_COLOR_OBSTACLE = 8,
+    SNAKE_COLOR_OBSTACLE = 7,
     SNAKE_COLOR_TAIL = 10,
     SNAKE_COLOR_HEAD = 12,
     SNAKE_COLOR_TEXT = 15,
     SNAKE_SCORE_X = 4,
     SNAKE_SCORE_Y = 4,
-    SNAKE_SCORE_W = 74,
-    SNAKE_SCORE_H = 9,
+    SNAKE_SCORE_W = 80,
+    SNAKE_SCORE_H = 13,
 };
 
 static void snake_render_panel(int x, int y, int width, int height) {
@@ -75,8 +75,9 @@ static void snake_render_score(const snake_model_t* model) {
     }
     score_text[6 + digits_len] = '\0';
 
-    fill_rect(SNAKE_SCORE_X, SNAKE_SCORE_Y, SNAKE_SCORE_W, SNAKE_SCORE_H, SNAKE_COLOR_BACKGROUND);
-    draw_text(SNAKE_SCORE_X + 1, SNAKE_SCORE_Y + 1, SNAKE_COLOR_TEXT, score_text, 1);
+    fill_rect(SNAKE_SCORE_X, SNAKE_SCORE_Y, SNAKE_SCORE_W, SNAKE_SCORE_H, SNAKE_COLOR_PANEL);
+    fill_rect(SNAKE_SCORE_X + 1, SNAKE_SCORE_Y + 1, SNAKE_SCORE_W - 2, SNAKE_SCORE_H - 2, SNAKE_COLOR_BACKGROUND);
+    draw_text(SNAKE_SCORE_X + 4, SNAKE_SCORE_Y + 3, SNAKE_COLOR_TEXT, score_text, 1);
 }
 
 void snake_render_menu(void) {
