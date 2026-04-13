@@ -28,6 +28,33 @@ static void snake_model_clear_occupancy(snake_model_t* model) {
     }
 }
 
+static int snake_model_cells_equal(snake_cell_t a, snake_cell_t b) {
+    return a.x == b.x && a.y == b.y;
+}
+
+static int snake_model_enqueue_growth_point(snake_model_t* model, snake_cell_t point) {
+    if (model->growth_count >= SNAKE_MAX_LENGTH) {
+        return 0;
+    }
+
+    uint16_t index = (uint16_t)((model->growth_head + model->growth_count) % SNAKE_MAX_LENGTH);
+    model->growth_points[index] = point;
+    model->growth_count++;
+    return 1;
+}
+
+static snake_cell_t snake_model_growth_point_front(const snake_model_t* model) {
+    return model->growth_points[model->growth_head];
+}
+
+static void snake_model_pop_growth_point(snake_model_t* model) {
+    if (model->growth_count == 0) {
+        return;
+    }
+    model->growth_head = (uint16_t)((model->growth_head + 1) % SNAKE_MAX_LENGTH);
+    model->growth_count--;
+}
+
 void snake_model_init_center(snake_model_t* model, snake_dir_t initial_dir, uint16_t initial_length) {
     if (initial_length == 0) {
         initial_length = 1;
@@ -70,6 +97,8 @@ void snake_model_init_center(snake_model_t* model, snake_dir_t initial_dir, uint
     model->has_apple = 0;
     model->apple.x = 0;
     model->apple.y = 0;
+    model->growth_head = 0;
+    model->growth_count = 0;
 
     snake_model_clear_occupancy(model);
 
@@ -130,7 +159,21 @@ int snake_model_is_occupied(const snake_model_t* model, int x, int y) {
     return model->occupancy[y][x] != 0;
 }
 
-int snake_model_step_no_growth(snake_model_t* model, snake_dir_t next_dir) {
+int snake_model_try_consume_apple(snake_model_t* model) {
+    if (!model->has_apple) {
+        return 0;
+    }
+    if (!snake_model_cells_equal(model->head, model->apple)) {
+        return 0;
+    }
+
+    snake_cell_t consumed_apple = model->apple;
+    model->has_apple = 0;
+    (void)snake_model_enqueue_growth_point(model, consumed_apple);
+    return 1;
+}
+
+int snake_model_step(snake_model_t* model, snake_dir_t next_dir) {
     int dx = 0;
     int dy = 0;
 
@@ -156,18 +199,32 @@ int snake_model_step_no_growth(snake_model_t* model, snake_dir_t next_dir) {
     int tail_x = (int)model->tail.x;
     int tail_y = (int)model->tail.y;
     int moving_into_tail = (next_x == tail_x) && (next_y == tail_y);
+    int should_grow = 0;
 
-    if (snake_model_is_occupied(model, next_x, next_y) && !moving_into_tail) {
+    if (model->growth_count > 0 && model->length > 1 && model->length < SNAKE_MAX_LENGTH) {
+        snake_cell_t reached_on_normal_step = model->body[model->length - 2];
+        should_grow = snake_model_cells_equal(reached_on_normal_step, snake_model_growth_point_front(model));
+    }
+
+    if (snake_model_is_occupied(model, next_x, next_y) && (!moving_into_tail || should_grow)) {
         return 0;
     }
 
-    if (model->length > 1) {
+    if (should_grow) {
+        for (int i = (int)model->length; i > 0; --i) {
+            model->body[i] = model->body[i - 1];
+        }
+        model->length++;
+        snake_model_pop_growth_point(model);
+    } else if (model->length > 1) {
         for (int i = (int)model->length - 1; i > 0; --i) {
             model->body[i] = model->body[i - 1];
         }
     }
 
-    model->occupancy[tail_y][tail_x] = 0;
+    if (!should_grow) {
+        model->occupancy[tail_y][tail_x] = 0;
+    }
     model->body[0].x = (uint8_t)next_x;
     model->body[0].y = (uint8_t)next_y;
     model->occupancy[next_y][next_x] = 1;

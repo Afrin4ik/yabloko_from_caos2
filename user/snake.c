@@ -98,12 +98,11 @@ int main() {
                 tick_dir = queued_dir;
             }
 
-            if (!snake_model_step_no_growth(&model, tick_dir)) {
+            if (!snake_model_step(&model, tick_dir)) {
                 alive = 0;
                 snake_runtime_log("game over\n");
             } else {
-                if (model.has_apple && model.head.x == model.apple.x && model.head.y == model.apple.y) {
-                    model.has_apple = 0;
+                if (snake_model_try_consume_apple(&model)) {
                     (void)snake_model_spawn_apple(&model);
                 }
                 snake_render_step(&model, prev_head, prev_tail);
