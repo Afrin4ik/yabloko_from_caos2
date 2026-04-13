@@ -16,9 +16,16 @@ enum {
     SNAKE_EAT_BEEP_MS = 40,
 };
 
+typedef enum {
+    SNAKE_PHASE_MENU = 0,
+    SNAKE_PHASE_GAME = 1,
+    SNAKE_PHASE_GAME_OVER = 2,
+} snake_phase_t;
+
 typedef struct {
     snake_model_t model;
     snake_input_t input;
+    snake_phase_t phase;
     int alive;
     int paused;
     uint64_t accumulator_ms;
@@ -45,11 +52,29 @@ static void snake_reset_game(snake_game_state_t* state, snake_dir_t initial_dir,
     state->last_time_ms = now_ms;
 }
 
-int main() {
+static void snake_start_game(snake_game_state_t* state, snake_dir_t initial_dir) {
+    snake_reset_game(state, initial_dir, SNAKE_INITIAL_LENGTH, SNAKE_TARGET_APPLE_COUNT);
+    state->phase = SNAKE_PHASE_GAME;
+    snake_render_full(&state->model);
+}
+
+static void snake_show_menu(snake_game_state_t* state) {
+    state->phase = SNAKE_PHASE_MENU;
+    snake_render_menu();
+}
+
+static void snake_show_game_over(snake_game_state_t* state) {
+    state->phase = SNAKE_PHASE_GAME_OVER;
+    snake_render_game_over(&state->model);
+}
+
+int main(void) {
     snake_game_state_t state;
     snake_dir_t initial_dir = SNAKE_DIR_RIGHT;
+    int exit_code = 0;
 
-    snake_reset_game(&state, initial_dir, SNAKE_INITIAL_LENGTH, SNAKE_TARGET_APPLE_COUNT);
+    snake_input_init(&state.input, initial_dir);
+    snake_show_menu(&state);
 
     snake_runtime_log("SNAKE MINI-LOG\n");
 
@@ -58,8 +83,6 @@ int main() {
         return 1;
     }
 
-    state.last_time_ms = snake_runtime_now_ms();
-    snake_render_full(&state.model);
     if (snake_runtime_present() != 0) {
         return 1;
     }
@@ -68,6 +91,7 @@ int main() {
         int processed = snake_input_poll(&state.input);
         if (processed < 0) {
             snake_runtime_log("poll failed\n");
+            exit_code = 1;
             break;
         }
 
@@ -76,13 +100,54 @@ int main() {
             break;
         }
 
-        if (snake_input_take_action(&state.input, SNAKE_INPUT_ACTION_RESTART)) {
-            snake_reset_game(&state, initial_dir, SNAKE_INITIAL_LENGTH, SNAKE_TARGET_APPLE_COUNT);
-            snake_runtime_log("restart\n");
-            snake_render_full(&state.model);
-            if (snake_runtime_present() != 0) {
+        if (state.phase == SNAKE_PHASE_MENU) {
+            if (snake_input_take_action(&state.input, SNAKE_INPUT_ACTION_RESTART) ||
+                snake_input_take_action(&state.input, SNAKE_INPUT_ACTION_CONFIRM)) {
+                snake_runtime_log("start\n");
+                snake_start_game(&state, initial_dir);
+                if (snake_runtime_present() != 0) {
+                    exit_code = 1;
+                    break;
+                }
+                continue;
+            }
+
+            if (syscall(SYS_sleep, 1) != 0) {
+                snake_runtime_log("sleep failed\n");
+                exit_code = 1;
                 break;
             }
+            continue;
+        }
+
+        if (state.phase == SNAKE_PHASE_GAME_OVER) {
+            if (snake_input_take_action(&state.input, SNAKE_INPUT_ACTION_RESTART) ||
+                snake_input_take_action(&state.input, SNAKE_INPUT_ACTION_CONFIRM)) {
+                snake_runtime_log("restart\n");
+                snake_start_game(&state, initial_dir);
+                if (snake_runtime_present() != 0) {
+                    exit_code = 1;
+                    break;
+                }
+                continue;
+            }
+
+            if (syscall(SYS_sleep, 1) != 0) {
+                snake_runtime_log("sleep failed\n");
+                exit_code = 1;
+                break;
+            }
+            continue;
+        }
+
+        if (snake_input_take_action(&state.input, SNAKE_INPUT_ACTION_RESTART)) {
+            snake_runtime_log("restart\n");
+            snake_start_game(&state, initial_dir);
+            if (snake_runtime_present() != 0) {
+                exit_code = 1;
+                break;
+            }
+            continue;
         }
 
         if (snake_input_take_action(&state.input, SNAKE_INPUT_ACTION_PAUSE_TOGGLE)) {
@@ -92,6 +157,9 @@ int main() {
             snake_input_set_turn_queue_enabled(&state.input, !state.paused);
             if (state.paused) {
                 snake_input_clear_turn_queue(&state.input);
+                snake_render_pause(&state.model);
+            } else {
+                snake_render_full(&state.model);
             }
             snake_runtime_log(state.paused ? "pause on\n" : "pause off\n");
         }
@@ -121,7 +189,13 @@ int main() {
 
             if (!snake_model_step(&state.model, tick_dir)) {
                 state.alive = 0;
+                state.phase = SNAKE_PHASE_GAME_OVER;
                 snake_runtime_log("game over\n");
+                snake_show_game_over(&state);
+                if (snake_runtime_present() != 0) {
+                    exit_code = 1;
+                }
+                break;
             } else {
                 if (snake_model_try_consume_apple(&state.model)) {
                     snake_runtime_beep(SNAKE_EAT_BEEP_HZ, SNAKE_EAT_BEEP_MS);
@@ -133,17 +207,23 @@ int main() {
             state.accumulator_ms -= tick_ms;
         }
 
+        if (exit_code != 0) {
+            break;
+        }
+
         if (snake_runtime_present() != 0) {
+            exit_code = 1;
             break;
         }
 
         if (syscall(SYS_sleep, 1) != 0) {
             snake_runtime_log("sleep failed\n");
+            exit_code = 1;
             break;
         }
     }
 
     syscall(SYS_leave13h, 0);
 
-    return 0;
+    return exit_code;
 }

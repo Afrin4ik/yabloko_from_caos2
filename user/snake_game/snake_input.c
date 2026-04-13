@@ -112,8 +112,10 @@ int snake_input_poll(snake_input_t* input) {
             input->pending_actions |= SNAKE_INPUT_ACTION_QUIT;
         } else if (keycode == 'r' || keycode == 'R') {
             input->pending_actions |= SNAKE_INPUT_ACTION_RESTART;
-        } else if (keycode == 'p' || keycode == 'P' || keycode == '\n') {
+        } else if (keycode == 'p' || keycode == 'P') {
             input->pending_actions |= SNAKE_INPUT_ACTION_PAUSE_TOGGLE;
+        } else if (keycode == '\n' || keycode == '\r') {
+            input->pending_actions |= SNAKE_INPUT_ACTION_CONFIRM;
         }
     }
 }
