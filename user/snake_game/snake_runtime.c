@@ -17,7 +17,7 @@ void snake_runtime_log(const char* message) {
 
 int snake_runtime_present(void) {
     if (present() != 0) {
-        snake_runtime_log("enter13h failed\n");
+        snake_runtime_log("present failed\n");
         return -1;
     }
     return 0;

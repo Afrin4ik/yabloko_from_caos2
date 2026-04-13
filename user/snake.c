@@ -8,6 +8,7 @@
 enum {
     SNAKE_INITIAL_LENGTH = 5,
     SNAKE_TARGET_APPLE_COUNT = 5,
+    SNAKE_TARGET_OBSTACLE_COUNT = 10,
 };
 
 typedef struct {
@@ -30,6 +31,7 @@ static void snake_reset_game(snake_game_state_t* state, snake_dir_t initial_dir,
     snake_input_init(&state->input, initial_dir);
     snake_model_init_center(&state->model, initial_dir, initial_length);
     snake_model_seed_random(&state->model, (uint32_t)now_ms);
+    snake_model_init_random_obstacles(&state->model, SNAKE_TARGET_OBSTACLE_COUNT);
     snake_fill_apples(&state->model, target_apple_count);
 
     state->alive = 1;

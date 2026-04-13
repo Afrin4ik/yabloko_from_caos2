@@ -1,5 +1,13 @@
 #include "snake_model.h"
 
+static int snake_model_find_apple_at(const snake_model_t* model, int x, int y);
+
+static int snake_model_pick_random_free_cell(snake_model_t* model, int* out_x, int* out_y);
+
+static int snake_model_is_in_bounds(int x, int y) {
+    return x >= 0 && y >= 0 && x < SNAKE_FIELD_WIDTH && y < SNAKE_FIELD_HEIGHT;
+}
+
 static uint32_t snake_model_rand_u32(snake_model_t* model) {
     uint32_t x = model->rng_state;
     if (x == 0) {
@@ -28,6 +36,60 @@ static void snake_model_clear_occupancy(snake_model_t* model) {
     }
 }
 
+static void snake_model_clear_obstacles(snake_model_t* model) {
+    model->obstacle_count = 0;
+    for (int y = 0; y < SNAKE_FIELD_HEIGHT; ++y) {
+        for (int x = 0; x < SNAKE_FIELD_WIDTH; ++x) {
+            model->obstacle_map[y][x] = 0;
+        }
+    }
+}
+
+static int snake_model_cell_is_free(const snake_model_t* model, int x, int y) {
+    if (!snake_model_is_in_bounds(x, y)) {
+        return 0;
+    }
+    if (model->occupancy[y][x] != 0) {
+        return 0;
+    }
+    if (model->obstacle_map[y][x] != 0) {
+        return 0;
+    }
+    if (snake_model_find_apple_at(model, x, y) >= 0) {
+        return 0;
+    }
+    return 1;
+}
+
+static int snake_model_add_obstacle(snake_model_t* model, int x, int y) {
+    if (!snake_model_cell_is_free(model, x, y)) {
+        return 0;
+    }
+    if (model->obstacle_count >= SNAKE_MAX_OBSTACLES) {
+        return 0;
+    }
+
+    model->obstacles[model->obstacle_count].x = (uint8_t)x;
+    model->obstacles[model->obstacle_count].y = (uint8_t)y;
+    model->obstacle_count++;
+    model->obstacle_map[y][x] = 1;
+    return 1;
+}
+
+static int snake_model_add_apple(snake_model_t* model, int x, int y) {
+    if (!snake_model_cell_is_free(model, x, y)) {
+        return 0;
+    }
+    if (model->apple_count >= SNAKE_MAX_APPLES) {
+        return 0;
+    }
+
+    model->apples[model->apple_count].x = (uint8_t)x;
+    model->apples[model->apple_count].y = (uint8_t)y;
+    model->apple_count++;
+    return 1;
+}
+
 static int snake_model_cells_equal(snake_cell_t a, snake_cell_t b) {
     return a.x == b.x && a.y == b.y;
 }
@@ -39,6 +101,37 @@ static int snake_model_find_apple_at(const snake_model_t* model, int x, int y) {
         }
     }
     return -1;
+}
+
+static int snake_model_pick_random_free_cell(snake_model_t* model, int* out_x, int* out_y) {
+    if (!out_x || !out_y) {
+        return 0;
+    }
+
+    const int total_cells = SNAKE_FIELD_WIDTH * SNAKE_FIELD_HEIGHT;
+    int free_cells = total_cells - (int)model->length - (int)model->apple_count - (int)model->obstacle_count;
+
+    if (free_cells <= 0) {
+        return 0;
+    }
+
+    int target = (int)(snake_model_rand_u32(model) % (uint32_t)free_cells);
+
+    for (int y = 0; y < SNAKE_FIELD_HEIGHT; ++y) {
+        for (int x = 0; x < SNAKE_FIELD_WIDTH; ++x) {
+            if (!snake_model_cell_is_free(model, x, y)) {
+                continue;
+            }
+            if (target == 0) {
+                *out_x = x;
+                *out_y = y;
+                return 1;
+            }
+            --target;
+        }
+    }
+
+    return 0;
 }
 
 static int snake_model_enqueue_growth_point(snake_model_t* model, snake_cell_t point) {
@@ -108,6 +201,7 @@ void snake_model_init_center(snake_model_t* model, snake_dir_t initial_dir, uint
     model->growth_count = 0;
 
     snake_model_clear_occupancy(model);
+    snake_model_clear_obstacles(model);
 
     for (uint16_t i = 0; i < model->length; ++i) {
         int x = wrap_coord(cx + tail_dx * (int)i, SNAKE_FIELD_WIDTH);
@@ -122,6 +216,40 @@ void snake_model_init_center(snake_model_t* model, snake_dir_t initial_dir, uint
     model->tail = model->body[model->length - 1];
 }
 
+int snake_model_has_obstacle(const snake_model_t* model, int x, int y) {
+    if (!snake_model_is_in_bounds(x, y)) {
+        return 0;
+    }
+    return model->obstacle_map[y][x] != 0;
+}
+
+int snake_model_spawn_obstacle(snake_model_t* model) {
+    if (model->obstacle_count >= SNAKE_MAX_OBSTACLES) {
+        return 0;
+    }
+
+    int x = 0;
+    int y = 0;
+    if (!snake_model_pick_random_free_cell(model, &x, &y)) {
+        return 0;
+    }
+    return snake_model_add_obstacle(model, x, y);
+}
+
+void snake_model_init_random_obstacles(snake_model_t* model, uint8_t target_count) {
+    if (target_count > SNAKE_MAX_OBSTACLES) {
+        target_count = SNAKE_MAX_OBSTACLES;
+    }
+
+    snake_model_clear_obstacles(model);
+
+    while (model->obstacle_count < target_count) {
+        if (!snake_model_spawn_obstacle(model)) {
+            break;
+        }
+    }
+}
+
 void snake_model_seed_random(snake_model_t* model, uint32_t seed) {
     model->rng_state = seed;
     if (model->rng_state == 0) {
@@ -134,38 +262,17 @@ int snake_model_spawn_apple(snake_model_t* model) {
         return 0;
     }
 
-    const int total_cells = SNAKE_FIELD_WIDTH * SNAKE_FIELD_HEIGHT;
-    int free_cells = total_cells - (int)model->length - (int)model->apple_count;
-
-    if (free_cells <= 0) {
+    int x = 0;
+    int y = 0;
+    if (!snake_model_pick_random_free_cell(model, &x, &y)) {
         return 0;
     }
 
-    int target = (int)(snake_model_rand_u32(model) % (uint32_t)free_cells);
-
-    for (int y = 0; y < SNAKE_FIELD_HEIGHT; ++y) {
-        for (int x = 0; x < SNAKE_FIELD_WIDTH; ++x) {
-            if (model->occupancy[y][x] != 0) {
-                continue;
-            }
-            if (snake_model_find_apple_at(model, x, y) >= 0) {
-                continue;
-            }
-            if (target == 0) {
-                model->apples[model->apple_count].x = (uint8_t)x;
-                model->apples[model->apple_count].y = (uint8_t)y;
-                model->apple_count++;
-                return 1;
-            }
-            --target;
-        }
-    }
-
-    return 0;
+    return snake_model_add_apple(model, x, y);
 }
 
 int snake_model_is_occupied(const snake_model_t* model, int x, int y) {
-    if (x < 0 || y < 0 || x >= SNAKE_FIELD_WIDTH || y >= SNAKE_FIELD_HEIGHT) {
+    if (!snake_model_is_in_bounds(x, y)) {
         return 0;
     }
     return model->occupancy[y][x] != 0;
@@ -223,6 +330,10 @@ int snake_model_step(snake_model_t* model, snake_dir_t next_dir) {
     if (model->growth_count > 0 && model->length > 1 && model->length < SNAKE_MAX_LENGTH) {
         snake_cell_t reached_on_normal_step = model->body[model->length - 2];
         should_grow = snake_model_cells_equal(reached_on_normal_step, snake_model_growth_point_front(model));
+    }
+
+    if (snake_model_has_obstacle(model, next_x, next_y)) {
+        return 0;
     }
 
     if (snake_model_is_occupied(model, next_x, next_y) && (!moving_into_tail || should_grow)) {
