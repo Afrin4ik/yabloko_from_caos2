@@ -16,6 +16,9 @@ enum {
     BYTE_MASK = 0xffu,
 };
 
+static volatile uint32_t speaker_off_deadline_ms = 0;
+static _Bool speaker_initialized = 0;
+
 static void speaker_off(void) {
     unsigned char value = port_byte_in(SPEAKER_DATA_PORT);
     port_byte_out(SPEAKER_DATA_PORT, (unsigned char)(value & (unsigned char)~SPEAKER_DISABLE_BITS));
@@ -42,13 +45,36 @@ static void speaker_on(uint16_t frequency_hz) {
     port_byte_out(SPEAKER_DATA_PORT, (unsigned char)(value | SPEAKER_ENABLE_BITS));
 }
 
+static void speaker_tick(void) {
+    if (speaker_off_deadline_ms == 0) {
+        return;
+    }
+
+    uint32_t now_ms = (uint32_t)pit_monotonic_ms();
+    if ((int32_t)(now_ms - speaker_off_deadline_ms) < 0) {
+        return;
+    }
+
+    speaker_off_deadline_ms = 0;
+    speaker_off();
+}
+
+void speaker_init(void) {
+    if (speaker_initialized) {
+        return;
+    }
+
+    speaker_initialized = 1;
+    add_timer_callback(speaker_tick);
+}
+
 void speaker_beep(uint16_t frequency_hz, uint16_t duration_ms) {
     if (frequency_hz == 0 || duration_ms == 0) {
+        speaker_off_deadline_ms = 0;
         speaker_off();
         return;
     }
 
     speaker_on(frequency_hz);
-    msleep((int)duration_ms);
-    speaker_off();
+    speaker_off_deadline_ms = (uint32_t)(pit_monotonic_ms() + (uint64_t)duration_ms);
 }

@@ -1,6 +1,7 @@
 #include "pit.h"
 #include "port.h"
 #include "../cpu/isr.h"
+#include "speaker.h"
 
 enum {
     PIT_CRYSTAL_HZ = 1193182,
@@ -80,6 +81,7 @@ void init_pit() {
     port_byte_out(0x40, (PIT_PROGRAM_REG & 0xff00) >> 8);
 
     register_interrupt_handler(IRQ0, timer_interrupt_handler);
+    speaker_init();
 }
 
 void msleep(int ms) {
