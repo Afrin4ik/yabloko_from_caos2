@@ -10,6 +10,7 @@
 #include "../drivers/mode13fb.h"
 #include "../drivers/keyboard.h"
 #include "../drivers/pit.h"
+#include "../drivers/speaker.h"
 #include "../drivers/port.h"
 #include "../drivers/vga.h"
 #include "../console.h"
@@ -277,6 +278,18 @@ static int handle_sleep(int32_t ms) {
     return 0;
 }
 
+static int handle_beep(uint32_t packed_tone) {
+    uint16_t frequency_hz = (uint16_t)(packed_tone & 0xffffu);
+    uint16_t duration_ms = (uint16_t)(packed_tone >> 16);
+
+    if (frequency_hz == 0 || duration_ms == 0) {
+        return 0;
+    }
+
+    speaker_beep(frequency_hz, duration_ms);
+    return 0;
+}
+
 static void handle_syscall(registers_t* r) {
     switch (r->eax) {
         case SYS_exit:
@@ -315,9 +328,13 @@ static void handle_syscall(registers_t* r) {
         case SYS_sleep:
             r->eax = handle_sleep((int32_t)r->ebx);
             break;
+        case SYS_beep:
+            r->eax = handle_beep((uint32_t)r->ebx);
+            break;
         default:
             printk("Unknown syscall\n");
             r->eax = -1;
+            break;
     }
 }
 

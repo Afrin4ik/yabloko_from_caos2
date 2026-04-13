@@ -9,6 +9,11 @@ enum {
     SNAKE_INITIAL_LENGTH = 5,
     SNAKE_TARGET_APPLE_COUNT = 5,
     SNAKE_TARGET_OBSTACLE_COUNT = 10,
+    SNAKE_BASE_TICK_MS = 120,
+    SNAKE_FAST_TICK_MS = 60,
+    SNAKE_FRAME_TIME_CAP_MS = 50,
+    SNAKE_EAT_BEEP_HZ = 880,
+    SNAKE_EAT_BEEP_MS = 40,
 };
 
 typedef struct {
@@ -43,9 +48,6 @@ static void snake_reset_game(snake_game_state_t* state, snake_dir_t initial_dir,
 int main() {
     snake_game_state_t state;
     snake_dir_t initial_dir = SNAKE_DIR_RIGHT;
-    const uint64_t base_tick_ms = 120;
-    const uint64_t fast_tick_ms = 60;
-    const uint64_t frame_time_cap_ms = 50;
 
     snake_reset_game(&state, initial_dir, SNAKE_INITIAL_LENGTH, SNAKE_TARGET_APPLE_COUNT);
 
@@ -94,13 +96,13 @@ int main() {
             snake_runtime_log(state.paused ? "pause on\n" : "pause off\n");
         }
 
-        uint64_t tick_ms = snake_input_is_held(&state.input, SNAKE_INPUT_KEY_SPEED) ? fast_tick_ms : base_tick_ms;
+        uint64_t tick_ms = snake_input_is_held(&state.input, SNAKE_INPUT_KEY_SPEED) ? SNAKE_FAST_TICK_MS : SNAKE_BASE_TICK_MS;
 
         uint64_t current_time_ms = snake_runtime_now_ms();
         uint64_t elapsed_ms = current_time_ms - state.last_time_ms;
         state.last_time_ms = current_time_ms;
-        if (elapsed_ms > frame_time_cap_ms) {
-            elapsed_ms = frame_time_cap_ms;
+        if (elapsed_ms > SNAKE_FRAME_TIME_CAP_MS) {
+            elapsed_ms = SNAKE_FRAME_TIME_CAP_MS;
         }
 
         if (!state.paused) {
@@ -122,6 +124,7 @@ int main() {
                 snake_runtime_log("game over\n");
             } else {
                 if (snake_model_try_consume_apple(&state.model)) {
+                    snake_runtime_beep(SNAKE_EAT_BEEP_HZ, SNAKE_EAT_BEEP_MS);
                     snake_fill_apples(&state.model, SNAKE_TARGET_APPLE_COUNT);
                 }
                 snake_render_step(&state.model, prev_head, prev_tail);
