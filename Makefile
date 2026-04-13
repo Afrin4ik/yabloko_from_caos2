@@ -16,6 +16,12 @@ GDB=x86_64-elf-gdb
 OBJCOPY=x86_64-elf-objcopy
 endif
 
+QEMU_AUDIODEV?=$(shell qemu-system-i386 -audiodev help 2>/dev/null | awk '/^(coreaudio|pipewire|pa|alsa|dsound|sdl|dbus|wav)$$/{print; exit}')
+QEMU_SOUND_FLAGS=
+ifneq ($(QEMU_AUDIODEV),)
+QEMU_SOUND_FLAGS=-machine pcspk-audiodev=spk -audiodev $(QEMU_AUDIODEV),id=spk
+endif
+
 CFLAGS = -fno-pic -ffreestanding -static -fno-builtin -fno-strict-aliasing \
 		 -mno-sse \
 		 -I. \
@@ -43,10 +49,16 @@ OBJECTS = ./kernel/kstart.o ./kernel.o ./console.o ./drivers/vga.o ./drivers/uar
 	./fs/fs.o ./drivers/ata.o ./drivers/pit.o ./kernel/vm.o
 
 run: image.bin
-	qemu-system-i386 -drive format=raw,file=$< -serial mon:stdio -qmp unix:qemu-monitor-socket,server,nowait
+	qemu-system-i386 -drive format=raw,file=$< -serial mon:stdio -qmp unix:qemu-monitor-socket,server,nowait $(QEMU_SOUND_FLAGS)
 
 run-nox: image.bin
-	qemu-system-i386 -nographic -drive format=raw,file=$< -serial mon:stdio -qmp unix:qemu-monitor-socket,server,nowait
+	qemu-system-i386 -nographic -drive format=raw,file=$< -serial mon:stdio -qmp unix:qemu-monitor-socket,server,nowait $(QEMU_SOUND_FLAGS)
+
+run-sound: image.bin
+	qemu-system-i386 -drive format=raw,file=$< -serial mon:stdio -qmp unix:qemu-monitor-socket,server,nowait $(QEMU_SOUND_FLAGS)
+
+run-nox-sound: image.bin
+	qemu-system-i386 -nographic -drive format=raw,file=$< -serial mon:stdio -qmp unix:qemu-monitor-socket,server,nowait $(QEMU_SOUND_FLAGS)
 
 test: tests.py
 	python3 tests.py --nox
